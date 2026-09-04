@@ -40,7 +40,7 @@ Each language accepts an optional `visibility` array. Omitting it uses the
 scanner default: TypeScript `public` and `protected` members, Swift `public`
 and `open`, Dart `public` only, Rust unrestricted `pub`. A declaration
 excluded by visibility is not an endpoint; an `@doc` on one is
-`unsupported_declaration`. See `docbridge docs show annotations` for the
+`unsupported_declaration`. See `docbridge docs show linking` for the
 per-language rules, including Dart's leading-underscore privacy.
 
 <!-- @code src/core/glob.ts#collectFiles -->

@@ -168,7 +168,7 @@ export function runInit(options: InitSharedOptions, io: CliIo, runtime: InitRunt
  * Prepare agent-guided adoption by installing the docbridge skill and printing setup guidance.
  *
  * @doc docs/specs/cli.md#init-with-agent-command
- * @doc docs/user/agent-integration.md#invoking-docbridge
+ * @doc docs/user/automation.md#invoking-docbridge
  */
 export function runInitWithAgent(
   options: InitSharedOptions,

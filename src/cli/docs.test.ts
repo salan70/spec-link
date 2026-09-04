@@ -34,13 +34,13 @@ test("file documentation reader lists documents by name with their descriptions"
   withUserDocs(
     {
       "troubleshooting.md": "---\ndescription: Diagnose failures.\n---\n# Troubleshooting\n",
-      "annotations.md": "---\ndescription: Write links.\n---\n# Annotations\n",
+      "linking.md": "---\ndescription: Write links.\n---\n# Linking\n",
     },
     (packageRoot) => {
       const reader = createFileDocumentationReader(packageRoot);
 
       expect(reader.list()).toEqual([
-        { name: "annotations", description: "Write links." },
+        { name: "linking", description: "Write links." },
         { name: "troubleshooting", description: "Diagnose failures." },
       ]);
     },
@@ -107,7 +107,7 @@ test("file documentation reader reports unavailable documentation when no docume
 test("file documentation reader hides link annotations but preserves fenced examples", () => {
   withUserDocs(
     {
-      "annotations.md": [
+      "linking.md": [
         "---",
         "description: Write links.",
         "---",
@@ -127,8 +127,8 @@ test("file documentation reader hides link annotations but preserves fenced exam
     (packageRoot) => {
       const reader = createFileDocumentationReader(packageRoot);
 
-      expect(reader.show("annotations")).not.toContain("src/core/markdown.ts#scanMarkdown");
-      expect(reader.show("annotations")).toContain("<!-- @code src/auth.ts#login -->");
+      expect(reader.show("linking")).not.toContain("src/core/markdown.ts#scanMarkdown");
+      expect(reader.show("linking")).toContain("<!-- @code src/auth.ts#login -->");
     },
   );
 });
@@ -207,6 +207,38 @@ test("runDocs writes a selected document body verbatim", () => {
   expect(output).toBe("# Commands\n");
 });
 
+test.each([
+  ["annotations", "linking"],
+  ["linking-workflow", "linking"],
+  ["link-review", "linking"],
+  ["agent-integration", "automation"],
+])("runDocs resolves the legacy name %s to %s with a deprecation warning", (legacy, canonical) => {
+  let shownName = "";
+  let output = "";
+  let error = "";
+  const reader: DocumentationReader = {
+    list: () => [
+      { name: "automation", description: "Automate DocBridge." },
+      { name: "linking", description: "Create and review links." },
+    ],
+    show: (name) => {
+      shownName = name;
+      return `# ${name}\n`;
+    },
+  };
+
+  const exitCode = runDocs(
+    { kind: "show", name: legacy },
+    { stdout: (text) => (output += text), stderr: (text) => (error += text) },
+    reader,
+  );
+
+  expect(exitCode).toBe(0);
+  expect(shownName).toBe(canonical);
+  expect(output).toBe(`# ${canonical}\n`);
+  expect(error).toBe(`Documentation name '${legacy}' is deprecated; use '${canonical}'.\n`);
+});
+
 test("runDocs rejects an unknown name", () => {
   const reader: DocumentationReader = {
     list: () => [
@@ -234,12 +266,8 @@ test("run docs list emits valid JSON for every packaged document", () => {
   expect(JSON.parse(c.out)).toEqual({
     documents: [
       {
-        name: "agent-integration",
-        description: "Wire DocBridge into coding agents, Git hooks, and CI.",
-      },
-      {
-        name: "annotations",
-        description: "Write @doc and @code annotations and valid link targets.",
+        name: "automation",
+        description: "Automate DocBridge with coding agents, Git hooks, and CI.",
       },
       {
         name: "commands",
@@ -254,12 +282,8 @@ test("run docs list emits valid JSON for every packaged document", () => {
         description: "Set up DocBridge in an existing TypeScript, Swift, Dart, or Rust project.",
       },
       {
-        name: "link-review",
-        description: "Audit existing links for semantic correctness, not just resolution.",
-      },
-      {
-        name: "linking-workflow",
-        description: "Choose what to link and propose candidates docs-first.",
+        name: "linking",
+        description: "Choose, create, and semantically review @doc and @code links.",
       },
       {
         name: "troubleshooting",
@@ -290,5 +314,21 @@ test("run docs show rejects an unknown name and lists available names", () => {
   expect(code).toBe(1);
   expect(c.out).toBe("");
   expect(c.err).toContain("Unknown documentation name: missing");
-  expect(c.err).toContain("agent-integration, annotations, commands");
+  expect(c.err).toContain("automation, commands, configuration");
+  expect(c.err).not.toContain("agent-integration");
+});
+
+test.each([
+  ["annotations", "linking", "# Linking\n"],
+  ["linking-workflow", "linking", "# Linking\n"],
+  ["link-review", "linking", "# Linking\n"],
+  ["agent-integration", "automation", "# Automation\n"],
+])("run docs show supports the packaged legacy name %s", (legacy, canonical, heading) => {
+  const c = capture();
+
+  const code = run(["docs", "show", legacy], c.io);
+
+  expect(code).toBe(0);
+  expect(c.out.startsWith(heading)).toBe(true);
+  expect(c.err).toBe(`Documentation name '${legacy}' is deprecated; use '${canonical}'.\n`);
 });

@@ -88,10 +88,13 @@ lint-fix:
     bun run oxlint . --fix --deny-warnings
 
 # Offline, read-only common gate shared by the pre-commit hook and CI.
-verify: format-check lint check typecheck test
+verify: format-check lint check check-docs typecheck test
 
 check:
     bun run src/cli/index.ts check
+
+check-docs:
+    bun run scripts/check-docs.ts
 
 check-example:
     bun run src/cli/index.ts check --root examples/typescript

@@ -4,7 +4,7 @@ How to run the DocBridge gate in CI so the pull request — not the agent
 session — is the enforcement point for linked counterparts.
 
 A local Git `pre-commit` hook (see
-[agent integration](../user/agent-integration.md)) is informational by design:
+[automation guide](../user/automation.md)) is informational by design:
 it raises awareness while the work is in progress but never blocks, and it sees
 only one commit's staged files. CI re-runs the same gate over the whole PR
 change set, and the human merge approval enforces the outcome.

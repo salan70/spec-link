@@ -43,6 +43,7 @@ Use the repo-native commands in `justfile`:
 - `just check`
 - `just check-example`
 - `just check-example-json`
+- `just check-docs`
 - `just audit`
 - `just check-audit-baseline`
 - `just check-fixture <code>`

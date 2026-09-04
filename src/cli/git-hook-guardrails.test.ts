@@ -54,7 +54,10 @@ test("the justfile provides the staged-change gate recipes the hook depends on",
 test("no current document links to the removed hook examples", () => {
   const tracked = trackedFiles().filter(
     (path) =>
-      path.endsWith(".md") && path !== "CHANGELOG.md" && !path.startsWith("docs/plans/done/"),
+      path.endsWith(".md") &&
+      path !== "CHANGELOG.md" &&
+      !path.startsWith("docs/plans/done/") &&
+      existsSync(join(ROOT, path)),
   );
 
   const offenders = tracked.filter((path) =>

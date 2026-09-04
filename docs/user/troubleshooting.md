@@ -43,7 +43,7 @@ These codes appear while writing `@doc` / `@code` pairs:
 | `doc_backlink_not_found` / `code_backlink_not_found` | one direction missing                    | add the missing `@code` or `@doc` side                |
 | `unsupported_declaration`                            | `@doc` on an unsupported declaration     | move the tag to a supported declaration               |
 | `dangling_code_annotation`                           | text between `@code` and the heading     | move the comment directly above the heading           |
-| `invalid_link_target`                                | malformed `file#fragment`                | rewrite the target; see `docs show annotations`       |
+| `invalid_link_target`                                | malformed `file#fragment`                | rewrite the target; see `docs show linking`           |
 | `duplicate_doc_anchor`                               | two headings share an anchor in one file | rename one heading so anchors stay unique             |
 | `duplicate_code_symbol`                              | two annotated declarations share an ID   | keep one `@doc` per canonical ID in that file         |
 | `duplicate_link`                                     | the same source repeats the same target  | remove the extra annotation                           |

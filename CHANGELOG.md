@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A documentation hub, matching Japanese task guides, and the read-only
+  `just check-docs` structural gate provide a maintained path through user,
+  integration, specification, and contributor documentation.
+
+### Changed
+
+- Packaged user documentation is consolidated into six task-oriented names:
+  `getting-started`, `configuration`, `linking`, `commands`, `automation`, and
+  `troubleshooting`.
+
+### Deprecated
+
+- `docbridge docs show annotations`, `linking-workflow`, and `link-review` now
+  resolve to `linking`, while `agent-integration` resolves to `automation`.
+  These hidden compatibility names warn on stderr and will be removed in
+  v0.10.0.
+
 ## [0.8.0] - 2026-08-18
 
 ### Added

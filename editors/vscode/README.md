@@ -54,6 +54,8 @@ For projects with `docbridge.config.json`, the extension provides:
 
 The language server behavior is specified in
 [../../docs/specs/lsp.md](../../docs/specs/lsp.md).
+For the core linking workflow and the rest of the documentation, use the
+[documentation hub](../../docs/README.md).
 
 ## Configuration
 

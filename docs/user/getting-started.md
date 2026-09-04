@@ -66,10 +66,10 @@ A clean graph exits `0`. Broken links and invalid configuration exit `1`.
 ## Next steps
 
 - Read `docbridge docs show configuration` before narrowing scan scope.
-- Read `docbridge docs show annotations` for link target rules.
-- Read `docbridge docs show linking-workflow` to choose sections and propose
-  candidates.
-- Read `docbridge docs show link-review` to audit existing links for meaning.
+- Read `docbridge docs show linking` to choose sections, write annotations, and
+  review links for meaning.
 - Read `docbridge docs show commands` to choose an inspection command.
+- Read `docbridge docs show automation` before adding hooks, CI, or an agent
+  workflow.
 - Read `docbridge docs show troubleshooting` when `check` reports a diagnostic.
 - Add `docbridge check` to CI after the local graph passes.

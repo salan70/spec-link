@@ -78,9 +78,9 @@ These pairs were missing contracts, not intentional gaps:
   `graph` (`run` remains on Command dispatch)
 - `docs/specs/diagnostics.md#unlinked-doc-sections` ↔ `resolveLinks`
 - `src/core/typescript.ts#scanTypeScript` ↔ `docs/specs/scanning.md#typescript-members`
-- `src/core/links.ts#parseLinkTarget` ↔ `docs/user/annotations.md#target-grammar`
+- `src/core/links.ts#parseLinkTarget` ↔ `docs/user/linking.md#target-grammar`
 - `src/core/context.ts#context` and `src/core/related.ts#related` ↔
-  `docs/user/agent-integration.md#editing-workflow`
+  `docs/user/automation.md#editing-workflow`
 - `src/core/glob.ts#collectFiles` ↔ `docs/user/configuration.md#excluded-files`
 - `src/core/types.ts#DocBridgeDiagnostic` ↔ `docs/specs/diagnostics.md#diagnostics`
 - `src/core/config.ts#DocBridgeConfig` ↔ `docs/specs/configuration.md#configuration`

@@ -473,10 +473,11 @@ exit with code `1`.
 ## Documentation Commands
 
 `docbridge docs list` discovers every `.md` file under the installed package's
-`docs/user/` directory. A document name is its filename without `.md`. Every
-document must start with YAML frontmatter containing a non-empty, single-line
-`description`; an invalid document makes the command fail instead of being
-silently omitted.
+`docs/user/` directory. A document name is its filename without `.md`. The
+canonical names are `getting-started`, `configuration`, `linking`, `commands`,
+`automation`, and `troubleshooting`. Every document must start with YAML
+frontmatter containing a non-empty, single-line `description`; an invalid
+document makes the command fail instead of being silently omitted.
 
 Human-readable list output sorts documents by name, aligns descriptions after
 the longest name, and ends with this hint:
@@ -506,6 +507,21 @@ content. Every name returned by `docs list` must be readable. An unknown name
 writes an error plus all available names to stderr, leaves stdout empty, and
 exits with code `1`.
 
+Through the v0.9.x release line, `docs show` also accepts these hidden aliases:
+
+| Deprecated name     | Canonical name |
+| ------------------- | -------------- |
+| `annotations`       | `linking`      |
+| `linking-workflow`  | `linking`      |
+| `link-review`       | `linking`      |
+| `agent-integration` | `automation`   |
+
+An alias prints the canonical document to stdout, writes exactly
+`Documentation name '<old-name>' is deprecated; use '<new-name>'.` followed by
+a newline to stderr, and exits with code `0`. Aliases are not files and never
+appear in human or JSON list output. They are scheduled for removal in v0.10.0;
+the removal is tracked by issue #129.
+
 If `docs/user` is missing or contains no Markdown documents, both operations
 report that documentation is unavailable, direct the user to reinstall
 DocBridge, and exit with code `1`.
@@ -513,8 +529,8 @@ DocBridge, and exit with code `1`.
 The package allowlist contains `docs/user` and excludes the developer-facing
 `docs/specs`, `docs/decisions`, `docs/contributing`, `docs/plans`, and `docs/ja`
 trees. The npm packed-package smoke test installs the tarball without a
-repository checkout and exercises `docs list --json` plus `docs show` for every
-shipped name under both Node.js and Bun.
+repository checkout and exercises `docs list --json`, all canonical names, all
+compatibility aliases, and an unknown name under both Node.js and Bun.
 
 <!-- @code src/cli/init.ts#runInit -->
 <!-- @code src/cli/init.ts#parseInitOptions -->

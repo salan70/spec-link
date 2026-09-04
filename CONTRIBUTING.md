@@ -108,8 +108,9 @@ Run the common read-only gate:
 just verify
 ```
 
-It runs formatting checks, lint, DocBridge's self-check, TypeScript type
-checking, and the Bun test suite. Also verify the distributable build:
+It runs formatting checks, lint, DocBridge's self-check, documentation structure
+checks, TypeScript type checking, and the Bun test suite. Also verify the
+distributable build:
 
 ```sh
 just build
@@ -158,6 +159,7 @@ the Bun integration tests. Rebuild both after changing worker code with
 ## Project references
 
 - [Testing](docs/contributing/testing.md)
+- [Documentation](docs/contributing/documentation.md)
 - [Self-audit](docs/contributing/self-audit.md)
 - [Commit messages](docs/contributing/commits.md)
 - [Pull requests](docs/contributing/pull-requests.md)
