@@ -3,410 +3,93 @@
 [![npm version](https://img.shields.io/npm/v/docbridge.svg)](https://www.npmjs.com/package/docbridge)
 [![English README](https://img.shields.io/badge/README-English-blue)](../../README.md)
 
-Markdown を LSP の世界へ。
+DocBridge は、Markdown ドキュメントと、その内容を実装するコードを双方向に
+結び付けます。TypeScript、Swift、Dart、Rust の対応宣言に書く `@doc` と、
+Markdown 見出しに書く `@code` を検証し、人間とコーディングエージェントが変更前に
+正しいカウンターパートへ到達できるようにします。
 
-DocBridge は TypeScript、Swift、Dart、Rust のコードと Markdown ドキュメントの間に双方向リンクを作るツールです。実装ファイルと仕様ファイルをまたいで、Hover、Definition、References、Diagnostics のような LSP 的体験を実現することを目指します。
+## 必要な環境
+
+- Node.js 22 以降、または Bun 1.1.31 以降
+- Markdown と対応言語のソースコードを含むプロジェクト
+
+対応する macOS / Linux 向けの Swift、Dart、Rust scanner はパッケージに同梱
+されています。対応 platform の詳細は
+[Releases](https://github.com/salan70/docbridge/releases) を参照してください。
 
 ## インストール
 
-DocBridge は npm package `docbridge` として配布し、Node.js (>= 22) と Bun の
-どちらでも実行できます。
+```sh
+npm install --save-dev docbridge
+```
+
+Bun を使う場合:
+
+```sh
+bun add --dev docbridge
+```
+
+## 最初のチェックを成功させる
+
+対話形式で初期設定を作成します。
+
+```sh
+npx docbridge init
+```
+
+TypeScript 向けの最小設定を手動で書く場合は次のとおりです。
+
+```json
+{
+  "$schema": "./node_modules/docbridge/schemas/docbridge.schema.json",
+  "include": {
+    "code": {
+      "typescript": {
+        "patterns": ["src/**/*.ts"]
+      }
+    },
+    "docs": ["docs/**/*.md"]
+  }
+}
+```
+
+対応するコード宣言にドキュメントのリンク先を追加します。
+
+```ts
+/** @doc docs/auth.md#login-flow */
+export function login(): void {}
+```
+
+Markdown 見出しの直前に逆向きのリンクを追加します。
+
+```md
+<!-- @code src/auth.ts#login -->
+
+## Login Flow
+```
+
+リンクの組を検証します。
 
 ```sh
 npx docbridge check
-# または
-bunx docbridge check
 ```
 
-現在のバージョンは、冒頭の npm バッジまたは
-[Releases](https://github.com/salan70/docbridge/releases) を参照してください。
-
-Swift / Dart / Rust scanner binary は `darwin-arm64` と `linux-x64` を同梱します。
-TypeScript と Markdown の check は scanner binary なしで実行できます。
-未対応 platform で Swift / Dart / Rust project を設定した場合は
-`code_scanner_unavailable` を報告し、対応 platform key を表示します。
-
-## クイックスタート
-
-プロジェクト root で初回セットアップを実行します。
-
-```sh
-bunx docbridge init
-```
-
-エージェント主導の導入では `docbridge` スキルをインストールし、セットアップ用
-コマンドを表示します。スキルは adopt / link / review / sync を振り分けます。
-
-```sh
-bunx docbridge init-with-agent
-```
-
-書き込み前に予定される操作を確認する:
-
-```sh
-bunx docbridge init --dry-run
-```
-
-`docbridge.config.json` を手動で作成することもできます。
-
-```json
-{
-  "include": {
-    "code": {
-      "typescript": {
-        "patterns": ["src/**/*.ts"]
-      }
-    },
-    "docs": ["docs/**/*.md"]
-  }
-}
-```
-
-export された TypeScript 宣言を Markdown section にリンクします。
-
-```ts
-/**
- * @doc docs/auth.md#login-spec
- */
-export async function login() {
-  // ...
-}
-```
-
-Markdown file に backlink を追加します。
-
-```md
-<!-- @code src/auth/login.ts#login -->
-
-## Login Spec
-
-Login flow specification.
-```
-
-プロジェクトを検査します。
-
-```sh
-bunx docbridge check
-```
-
-## 使い方
-
-コマンドの使い方を調べる:
-
-```sh
-bunx docbridge --help
-bunx docbridge context --help
-```
-
-すべてのコマンドが `--help`（別名 `-h`）を受け付け、使用方法・使いどころ・
-オプションを stdout に出力します。
-
-リンクを検査する:
-
-```sh
-bunx docbridge check
-```
-
-別 root を検査する:
-
-```sh
-bunx docbridge check --root examples/typescript
-```
-
-JSON を出力する:
-
-```sh
-bunx docbridge check --json
-```
-
-監査診断を有効にする:
-
-```sh
-bunx docbridge check --audit
-```
-
-監査診断には以下を含めます。
-
-- `undocumented_symbol` — 対象範囲のコードエンドポイントのうち `@doc` がないもの
-- `unlinked_doc_section` — 対象範囲のドキュメントセクションのうち `@code` がないもの
-
-`unlinked_doc_section` は見出しツリー単位でロールアップして報告します。`@code` を
-持たない見出しであっても、その配下のいずれかの見出しが `@code` を持つ場合は報告しま
-せん。報告するのは、自身と全子孫が `@code` を持たないサブツリーの最上位の見出しだけ
-です。
-
-変更したファイルにリンクされたカウンターパートを一覧する:
-
-```sh
-git diff --name-only | bunx docbridge related --stdin
-```
-
-`docbridge related` は情報提供のためのコマンドです。各カウンターパートと、それ自身が
-変更セットに含まれるかどうかを報告し、成功時は常に `0` で終了します。変更ファイルは
-位置引数でも渡せます。`--gate` を付けると、変更セットに含まれていないカウンターパート
-のみを報告し、1 件以上あれば `1` で終了します。どちらのモードも `--root` と
-`--json` に対応します。詳細は [../specs/cli.md](../specs/cli.md) を参照してください。
-
-変更したファイルにリンクされたカウンターパートの内容を出力する:
-
-```sh
-git diff --name-only | bunx docbridge context --stdin
-```
-
-`docbridge context` は「リンクされたカウンターパートに何が書かれているか」に答える
-コマンドです。ドキュメント側のカウンターパートは Markdown セクション全体、コード側の
-カウンターパートは JSDoc を含む宣言全体を出力します。デフォルト出力はエージェントの
-プロンプトへそのまま注入できる Markdown で、`--json` は
-[../../schemas/context-output.schema.json](../../schemas/context-output.schema.json)
-に従います。抽出はベストエフォートで、リンク切れがあっても成功時は `0` で終了します。
-詳細は [../specs/cli.md](../specs/cli.md) を参照してください。
-
-解決済みリンクグラフを確認する:
-
-```sh
-bunx docbridge graph
-bunx docbridge graph --json --include-content
-```
-
-`docbridge graph` は解決可能な片方向リンクも含めた endpoint graph を出力します。
-JSON 出力は [../../schemas/graph-output.schema.json](../../schemas/graph-output.schema.json)
-に従います。
-
-## なぜ DocBridge か
-
-現代のソフトウェアプロジェクトでは、実装とドキュメントの間にずれが生まれがちです。
-
-- コードを変更してもドキュメントが更新されない
-- ドキュメントを変更してもコードが更新されない
-- ある実装に関係する仕様を見つけにくい
-- ある仕様に関係する実装を見つけにくい
-- AI コーディングエージェントが変更時に必要な文脈を見つけにくい
-
-DocBridge は、コードとドキュメントの関係を明示的で、移動可能で、機械可読なものにします。
-
-## コンセプト
-
-従来のドキュメントツールは、多くの場合一方向の関係を扱います。
-
-```text
-Code -> Documentation
-```
-
-DocBridge は双方向の関係を扱います。
-
-```text
-Code <-> Documentation
-```
-
-DocBridge は、対応しているコード宣言と Markdown セクションをリンクします。TypeScript はプロセス内でスキャンし、Swift、Dart、Rust は同梱する first-party worker package でスキャンします。
-
-## 対応入力
-
-DocBridge は以下の要素を対象にします。
-
-対象にするコード宣言:
-
-- TypeScript のトップレベル export 宣言: `function`、`class`、`abstract class`、`interface`、`type`、`const`、`enum`、および対応する `declare` / 名前付き default 形式
-- TypeScript の型 member: class の method、property、accessor、constructor、static member、および interface と object 型 alias の signature
-- Swift の `public` / `open` 宣言と、設定で含めた `internal` 宣言: トップレベルと member の型、関数、変数、定数、initializer、extension member
-- Dart の public 宣言: トップレベル関数/変数、class、enum、mixin、constructor、field、accessor、method、extension member
-- Rust の `pub` 宣言（`visibility` で非 `pub` も設定可）: module、struct、enum、自由関数、inherent `impl` method
-
-対象にする Markdown 要素:
-
-- ATX 見出し
-- HTML コメント
-- 次の見出しに紐づく `@code` アノテーション
-
-4 言語とも同じ `@doc` / `@code` モデルを使います。コード側 fragment は
-scanner が生成する canonical ID で、member は型名で修飾されます。
-
-TypeScript の member ID は引数シグネチャを持ちません。overload signature と
-getter/setter のペアはそれぞれ 1 つのエンドポイントに集約され、constructor は
-`<型名>.constructor` になります。既定では `public` と `protected` の member を
-対象にし、`private` を含めるには `include.code.typescript.visibility` の設定が
-必要です。member はリンク可能ですが、`check --audit` の報告対象にはなりません。
-
-```ts
-export class AuthService {
-  /** @doc docs/auth.md#login-spec */
-  login(email: string, password: string): void {}
-}
-```
-
-```md
-<!-- @code src/auth/service.ts#AuthService.login -->
-
-## Login Spec
-```
-
-Swift、Dart、Rust の canonical ID はそれぞれの慣習に従います。
-
-```swift
-/// @doc docs/auth.md#login-spec
-public struct AuthService {
-  public func login(email: String, password: String) {}
-}
-```
-
-```md
-<!-- @code Sources/AuthService.swift#AuthService.login(email:password:) -->
-
-## Login Spec
-```
-
-プロジェクトは `docbridge.config.json` でスキャン対象を定義する必要があります。
-暗黙のデフォルト設定はありません。設定ファイルがない場合、DocBridge は
-`config_file_invalid` を報告し、プロジェクトファイルをスキャンしません。
-
-TypeScript 向けの最小設定:
-
-```json
-{
-  "include": {
-    "code": {
-      "typescript": {
-        "patterns": ["src/**/*.ts"]
-      }
-    },
-    "docs": ["docs/**/*.md"]
-  }
-}
-```
-
-多言語設定は language-keyed です。古い `include.code` の配列形式は無効です。`typescript` entry に移行してください。
-
-```json
-{
-  "include": {
-    "code": {
-      "typescript": { "patterns": ["src/**/*.ts"] },
-      "swift": { "patterns": ["Sources/**/*.swift"] },
-      "dart": { "patterns": ["lib/**/*.dart"] }
-    },
-    "docs": ["docs/**/*.md"]
-  }
-}
-```
-
-source checkout から Swift / Dart / Rust project を検査するには、先に scanner worker を build します。Swift は `just build-swift-scanner`、Dart は `just build-dart-scanner`、Rust は `just build-rust-scanner` を使ってください。
-
-## AI エージェント統合
-
-DocBridge のリンクグラフは、AI コーディングエージェントから利用されることを想定して
-設計されています。
-
-- [../integrations](../integrations) — Claude Code、Codex、CI 向けのレシピ:
-  `docbridge related --gate` によるゲートのトリアージ、`docbridge context` による
-  カウンターパートの内容取得、PR へのレポート。
-- [../../templates/skills](../../templates/skills) — `docbridge init` と
-  `docbridge init-with-agent` がインストールする配布用 `docbridge` スキル。
-  バイナリの事実は `docbridge docs show` が提供します。既存の 5 スキル構成は
-  `docbridge init --force` まで残ります。
-
-このリポジトリ自身も `.claude/` と `.agents/` でこれらのスキルをドッグフーディング
-しており、ガードレールはエージェントの設定ではなく `.githooks/` の Git `pre-commit`
-フックに置いています。
-
-## エディタ対応
-
-DocBridge は、同じリンクグラフをエディタへ公開する Language Server を同梱します。
-
-```sh
-docbridge lsp
-```
-
-`docbridge lsp` は stdio 上で LSP を話し、リンクされたコードと Markdown を
-またいで Diagnostics、Hover、Definition、References を提供します。オプションは
-受け取らず、プロジェクト root はエディタの `initialize` リクエストから決まります。
-`docbridge check` は変更ありません。
-
-VS Code 互換の extension は [../../editors/vscode](../../editors/vscode) に
-あります。Language Server を VS Code と Cursor 向けの VSIX に同梱します。
-[DocBridge (`salan70.docbridge`)](https://marketplace.visualstudio.com/items?itemName=salan70.docbridge)
-を VS Code Marketplace からインストールできます。エディタから Bun が見える必要が
-あり、GUI が `PATH` 上の `bun` を見つけられないときは `docbridge.bunPath` を
-設定します。
-
-コントリビュータは、対応済みの `dist/bin/darwin-arm64` /
-`dist/bin/linux-x64` scanner artifact を準備し、VSIX をローカルで生成・検証できます:
-
-```sh
-just package-vsix
-just verify-vsix
-```
-
-registry への公開は引き続き手動です
-（`VSCE_PAT=<token> just publish-vscode-extension`）。Open VSX 配信は対象外です。
-Zed 統合は別タスクで、まだ実装されていません。MCP 配信は、長時間動作する tool
-server を必要とする具体的な consumer が現れるまで対象外です。詳細な LSP の挙動は
-[../specs/lsp.md](../specs/lsp.md) に定義しています。
-
-## Diagnostics
-
-Errors:
-
-- `config_file_invalid`
-- `config_unknown_key`
-- `config_invalid_value`
-- `invalid_link_target`
-- `doc_file_not_found`
-- `doc_anchor_not_found`
-- `code_file_not_found`
-- `code_backlink_not_found`
-- `doc_backlink_not_found`
-- `duplicate_doc_anchor`
-- `duplicate_code_symbol`
-- `code_parse_error`
-- `code_scanner_unavailable`
-- `code_scanner_failed`
-- `file_read_error`
-
-Warnings:
-
-- `duplicate_link`
-- `dangling_code_annotation`
-- `unsupported_declaration`
-- `--audit` 有効時の `undocumented_symbol`
-- `--audit` 有効時の `unlinked_doc_section`
-
-終了コード:
-
-- error が 1 件以上あれば `1`
-- warning のみ、または診断なしなら `0`
-
-## コントリビューション
-
-固定された開発環境、リポジトリのセットアップ、テスト範囲、コミット規約、
-Pull Request の流れは [CONTRIBUTING.md](../../CONTRIBUTING.md) を参照してください。
-
-## 関連ドキュメント
-
-- コントリビュータガイド: [../../CONTRIBUTING.md](../../CONTRIBUTING.md)
-- 英語 README: [../../README.md](../../README.md)
-- 仕様: [../specs](../specs)
-- v0.1 決定事項: [../decisions/v0.1.md](../decisions/v0.1.md)
-- v0.2 決定事項: [../decisions/v0.2.md](../decisions/v0.2.md)
-- v0.3 決定事項: [../decisions/v0.3.md](../decisions/v0.3.md)
-- AI エージェント統合レシピ: [../integrations](../integrations)
-- Commit message convention: [contributing/commits.md](contributing/commits.md)
-- English commit message convention: [../contributing/commits.md](../contributing/commits.md)
-- Pull Request 規約: [../contributing/pull-requests.md](../contributing/pull-requests.md)
-- テスト規約: [contributing/testing.md](contributing/testing.md)
-- English testing convention: [../contributing/testing.md](../contributing/testing.md)
-
-## Roadmap
-
-完了済みの v0.1〜v0.6 の機能は、上記の説明と
-[../../CHANGELOG.md](../../CHANGELOG.md) に記載しています。
-
-残っている editor 配信作業:
-
-- 手動フローが安定したあとの GitHub Release VSIX 添付と registry publish の自動化
-- Zed 向けの独立した統合経路を追加する
-
-## Vision
-
-DocBridge はドキュメントジェネレーターではありません。
-
-目的は、コードとドキュメントの関係を可視化し、移動可能にし、機械可読にすることです。人間と AI エージェントのどちらも、最小の手間で必要な文脈に到達できる状態を目指します。
+リンクグラフが正しければ終了コードは `0` です。設定不備、未解決のリンク先、
+backlink の欠落がある場合は診断を表示して `1` で終了します。
+
+## 次に読むガイド
+
+- [はじめに](user/getting-started.md) — インストールと初期設定
+- [設定](user/configuration.md) — 対象範囲、言語、可視性
+- [リンク](user/linking.md) — 対象選定、アノテーション、意味のレビュー
+- [コマンド](user/commands.md) — check、related、context、graph、docs
+- [自動化](user/automation.md) — エージェント、Git hook、CI
+- [トラブルシューティング](user/troubleshooting.md) — 設定・scanner・リンク診断
+- [英語のドキュメントハブ](../README.md)
+
+英語のタスクガイドは CLI と同じ version で配布されます。
+`npx docbridge docs list` と `npx docbridge docs show <name>` で参照できます。
+
+コントリビュータ向けの環境・テスト・Pull Request 規約は
+[CONTRIBUTING.md](../../CONTRIBUTING.md)、ドキュメントの配置と執筆規約は
+[Documentation Guidelines](../contributing/documentation.md) を参照してください。

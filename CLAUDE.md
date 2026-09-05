@@ -73,6 +73,7 @@ Use the repo-native commands in `justfile` instead of ad-hoc shell invocations:
 - `just check` — run the default DocBridge check
 - `just check-example` — check the `examples/typescript` project
 - `just check-example-json` — check the example with JSON output
+- `just check-docs` — verify bilingual user-guide structure and local links
 - `just audit` — run audit diagnostics
 - `just check-audit-baseline` — compare live `--audit` keys against the committed
   repository baseline

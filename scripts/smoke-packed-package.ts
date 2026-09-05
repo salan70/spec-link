@@ -20,6 +20,28 @@ import {
 // The packaged CLI must work for both npm/Node and Bun consumers.
 const cliRuntimes = ["node", "bun"] as const;
 
+const canonicalDocumentationNames = [
+  "automation",
+  "commands",
+  "configuration",
+  "getting-started",
+  "linking",
+  "troubleshooting",
+] as const;
+
+const legacyDocumentationNames = {
+  annotations: "linking",
+  "linking-workflow": "linking",
+  "link-review": "linking",
+  "agent-integration": "automation",
+} as const;
+
+export type CommandResult = {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+};
+
 type SmokeOptions = {
   scannerFixtures: boolean;
 };
@@ -135,19 +157,9 @@ function installAndSmoke(tarballPath: string, tempRoot: string, options: SmokeOp
   for (const runtime of cliRuntimes) {
     run([runtime, "node_modules/.bin/docbridge", "--version"], tempRoot);
     run([runtime, "node_modules/.bin/docbridge", "--help"], tempRoot);
-    run([runtime, "node_modules/.bin/docbridge", "docs", "list", "--json"], tempRoot);
-    for (const document of [
-      "getting-started",
-      "configuration",
-      "annotations",
-      "commands",
-      "agent-integration",
-      "linking-workflow",
-      "link-review",
-      "troubleshooting",
-    ]) {
-      run([runtime, "node_modules/.bin/docbridge", "docs", "show", document], tempRoot);
-    }
+    assertDocumentationCommands((args) =>
+      runResult([runtime, "node_modules/.bin/docbridge", ...args], tempRoot),
+    );
   }
 
   mkdirSync(join(tempRoot, "fixture/src"), { recursive: true });
@@ -258,16 +270,80 @@ function writeFixtureConfig(
   );
 }
 
-function run(command: string[], cwd: string): void {
+export function assertDocumentationCommands(execute: (args: string[]) => CommandResult): void {
+  const listResult = execute(["docs", "list", "--json"]);
+  assertExitCode(listResult, 0, "docs list --json");
+  if (listResult.stderr !== "") {
+    throw new Error("docs list --json wrote unexpected stderr output");
+  }
+  const listOutput = JSON.parse(listResult.stdout) as {
+    documents?: Array<{ name?: string }>;
+  };
+  const listedNames = listOutput.documents?.map(({ name }) => name) ?? [];
+  if (JSON.stringify(listedNames) !== JSON.stringify(canonicalDocumentationNames)) {
+    throw new Error(`docs list returned non-canonical names: ${listedNames.join(", ")}`);
+  }
+
+  const canonicalBodies = new Map<string, string>();
+  for (const name of canonicalDocumentationNames) {
+    const result = execute(["docs", "show", name]);
+    assertExitCode(result, 0, `docs show ${name}`);
+    if (result.stdout === "" || result.stderr !== "") {
+      throw new Error(`docs show ${name} did not return clean canonical output`);
+    }
+    canonicalBodies.set(name, result.stdout);
+  }
+
+  for (const [legacy, canonical] of Object.entries(legacyDocumentationNames)) {
+    const result = execute(["docs", "show", legacy]);
+    assertExitCode(result, 0, `docs show ${legacy}`);
+    if (result.stdout !== canonicalBodies.get(canonical)) {
+      throw new Error(`docs show ${legacy} did not return ${canonical}`);
+    }
+    const warning = `Documentation name '${legacy}' is deprecated; use '${canonical}'.\n`;
+    if (result.stderr !== warning) {
+      throw new Error(`docs show ${legacy} did not return the deprecation warning`);
+    }
+  }
+
+  const unknown = execute(["docs", "show", "missing"]);
+  assertExitCode(unknown, 1, "docs show missing");
+  const availableNames = `Available names:\n  ${canonicalDocumentationNames.join(", ")}`;
+  if (unknown.stdout !== "" || !unknown.stderr.includes(availableNames)) {
+    throw new Error("docs show missing did not return the canonical unknown-name error");
+  }
+  for (const legacy of Object.keys(legacyDocumentationNames)) {
+    if (unknown.stderr.includes(legacy)) {
+      throw new Error(`docs show missing exposed legacy name ${legacy}`);
+    }
+  }
+}
+
+function assertExitCode(result: CommandResult, expected: number, label: string): void {
+  if (result.exitCode !== expected) {
+    throw new Error(`${label} exited ${result.exitCode}; expected ${expected}`);
+  }
+}
+
+function runResult(command: string[], cwd: string): CommandResult {
   const result = Bun.spawnSync({
     cmd: command,
     cwd,
     stdout: "pipe",
     stderr: "pipe",
   });
+  return {
+    exitCode: result.exitCode,
+    stdout: new TextDecoder().decode(result.stdout),
+    stderr: new TextDecoder().decode(result.stderr),
+  };
+}
+
+function run(command: string[], cwd: string): void {
+  const result = runResult(command, cwd);
   if (result.exitCode !== 0) {
-    console.error(new TextDecoder().decode(result.stdout));
-    console.error(new TextDecoder().decode(result.stderr));
+    console.error(result.stdout);
+    console.error(result.stderr);
     fail(`Command failed: ${command.join(" ")}`);
   }
 }

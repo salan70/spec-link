@@ -5,7 +5,7 @@ through the distributable skill.
 
 DocBridge does not ship agent hooks. Its guardrail belongs in Git hooks and CI,
 where it applies to every contributor and every tool rather than to one agent
-client; see [agent integration](../user/agent-integration.md) and the
+client; see [automation](../user/automation.md) and the
 [CI recipe](ci.md).
 
 ## Skills

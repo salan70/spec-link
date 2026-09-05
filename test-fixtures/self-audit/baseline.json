@@ -823,32 +823,37 @@
     },
     {
       "code": "unlinked_doc_section",
-      "target": "docs/user/agent-integration.md#ci",
+      "target": "docs/user/automation.md#agent-specific-recipes",
       "class": "structural_doc"
     },
     {
       "code": "unlinked_doc_section",
-      "target": "docs/user/agent-integration.md#hooks",
+      "target": "docs/user/automation.md#continuous-integration",
       "class": "structural_doc"
     },
     {
       "code": "unlinked_doc_section",
-      "target": "docs/user/agent-integration.md#read-more",
+      "target": "docs/user/automation.md#git-hooks",
       "class": "structural_doc"
     },
     {
       "code": "unlinked_doc_section",
-      "target": "docs/user/annotations.md#anchors-and-reciprocity",
-      "class": "structural_doc"
-    },
-    {
-      "code": "unlinked_doc_section",
-      "target": "docs/user/annotations.md#code-to-documentation",
+      "target": "docs/user/automation.md#next-steps",
       "class": "structural_doc"
     },
     {
       "code": "unlinked_doc_section",
       "target": "docs/user/commands.md#common-options",
+      "class": "structural_doc"
+    },
+    {
+      "code": "unlinked_doc_section",
+      "target": "docs/user/commands.md#documentation-commands",
+      "class": "structural_doc"
+    },
+    {
+      "code": "unlinked_doc_section",
+      "target": "docs/user/commands.md#next-steps",
       "class": "structural_doc"
     },
     {
@@ -878,12 +883,32 @@
     },
     {
       "code": "unlinked_doc_section",
-      "target": "docs/user/link-review.md#link-review",
+      "target": "docs/user/linking.md#choose-what-to-link",
       "class": "structural_doc"
     },
     {
       "code": "unlinked_doc_section",
-      "target": "docs/user/linking-workflow.md#linking-workflow",
+      "target": "docs/user/linking.md#code-to-documentation",
+      "class": "structural_doc"
+    },
+    {
+      "code": "unlinked_doc_section",
+      "target": "docs/user/linking.md#heading-anchors-and-reciprocity",
+      "class": "structural_doc"
+    },
+    {
+      "code": "unlinked_doc_section",
+      "target": "docs/user/linking.md#next-steps",
+      "class": "structural_doc"
+    },
+    {
+      "code": "unlinked_doc_section",
+      "target": "docs/user/linking.md#propose-candidates-docs-first",
+      "class": "structural_doc"
+    },
+    {
+      "code": "unlinked_doc_section",
+      "target": "docs/user/linking.md#semantic-link-review",
       "class": "structural_doc"
     },
     {

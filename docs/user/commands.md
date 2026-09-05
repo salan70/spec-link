@@ -62,3 +62,16 @@ direct counterparts. `--include-content` is available only with `--json`.
 The project commands accept `--root <path>` when invoked outside the project
 root. Run `docbridge <command> --help` for the exact options and exit behavior
 of a command.
+
+## Documentation commands
+
+Use `docbridge docs list` to see the version-matched guides installed with the
+CLI and `docbridge docs show <name>` to print one. The canonical names are
+`getting-started`, `configuration`, `linking`, `commands`, `automation`, and
+`troubleshooting`.
+
+## Next steps
+
+- Read `docbridge docs show linking` before creating or reviewing a pair.
+- Read `docbridge docs show automation` before adding repository automation.
+- Read `docbridge docs show troubleshooting` when a command reports a failure.

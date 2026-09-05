@@ -20,6 +20,12 @@ export type DocsCommand = { kind: "list"; json: boolean } | { kind: "show"; name
 
 const SHOW_HELP = "Run `docbridge docs show <name>` to read a document.";
 const DOCUMENTATION_UNAVAILABLE = "Documentation is unavailable in this installation.";
+const LEGACY_DOCUMENT_NAMES = new Map([
+  ["annotations", "linking"],
+  ["linking-workflow", "linking"],
+  ["link-review", "linking"],
+  ["agent-integration", "automation"],
+]);
 const DOCUMENTATION_REINSTALL_GUIDANCE = [
   "Reinstall DocBridge so the packaged documentation is restored, then retry:",
   "",
@@ -175,13 +181,17 @@ export function runDocs(
     return 0;
   }
 
-  const content = reader.show(command.name);
+  const canonicalName = LEGACY_DOCUMENT_NAMES.get(command.name) ?? command.name;
+  const content = reader.show(canonicalName);
   if (content === undefined) {
     const names = reader.list().map(({ name }) => name);
     throw new CliError(
       `Unknown documentation name: ${command.name}`,
       `Available names:\n  ${names.join(", ")}\n\n${SHOW_HELP}`,
     );
+  }
+  if (canonicalName !== command.name) {
+    io.stderr(`Documentation name '${command.name}' is deprecated; use '${canonicalName}'.\n`);
   }
   io.stdout(content);
   return 0;
