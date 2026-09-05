@@ -125,6 +125,30 @@ test("checkDocumentation reports broken relative files and heading fragments", (
   });
 });
 
+test("checkDocumentation validates the target of a badge-wrapped link", () => {
+  withDocumentation((root) => {
+    write(
+      root,
+      "README.md",
+      "[Documentation](docs/README.md)\n[![日本語](https://example.com/badge.svg)](docs/missing.md)\n",
+    );
+
+    expect(checkDocumentation(root)).toContain("README.md links to missing file: docs/missing.md");
+  });
+});
+
+test("checkDocumentation ignores link-looking syntax inside inline code", () => {
+  withDocumentation((root) => {
+    write(
+      root,
+      "docs/user/getting-started.md",
+      "---\ndescription: Start.\n---\n\n# Start\n\nUse `[Missing](missing.md)` as an example.\n",
+    );
+
+    expect(checkDocumentation(root)).toEqual([]);
+  });
+});
+
 test("checkDocumentation resolves GitHub-style duplicate heading suffixes", () => {
   withDocumentation((root) => {
     write(

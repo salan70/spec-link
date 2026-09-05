@@ -28,6 +28,7 @@
 
 - path separator は `/` を使う
 - file と fragment の両方を書く
+- アノテーションを書いたファイル自身を target にしない（同一ファイルの target は無効）
 - `./`、`../`、絶対 path、target 内の空白は使わない
 - target の後ろには説明用テキストを追加できる
 
@@ -111,7 +112,8 @@ fragment には scanner が生成した canonical symbol ID をそのまま使�
 
 DocBridge は ATX 見出しだけを小文字化し、空白と記号の連続を `-` に変換し、先頭と
 末尾の `-` を除いて anchor を作ります。Unicode の文字と数字は保持されます。
-空見出しは anchor を持ちません。同じファイルの重複 anchor は
+空見出しは anchor を持たず、空見出しに付けた `@code` は
+`dangling_code_annotation` になります。同じファイルの重複 anchor は
 `duplicate_doc_anchor` で、GitHub のような連番は追加しません。
 
 各方向は独立して検証されます。片方向の target が存在しても backlink がなければ

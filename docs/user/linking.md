@@ -40,6 +40,7 @@ Both annotations take a project-root-relative `file#fragment` target:
 
 - use `/` path separators;
 - include both file and fragment;
+- do not target the file that contains the annotation (same-file targets are invalid);
 - do not use `./`, `../`, absolute paths, or whitespace inside the target; and
 - optionally add human-readable text after the target.
 
@@ -136,8 +137,10 @@ collapses runs of whitespace and punctuation to `-`, preserves Unicode letters
 and numbers, and removes leading and trailing hyphens. `## Login Spec (v2)` is
 `#login-spec-v2`.
 
-Empty headings have no anchor. Duplicate non-empty anchors in one file produce
-`duplicate_doc_anchor`; DocBridge does not add GitHub-style numeric suffixes.
+Empty headings have no anchor; a `@code` annotation attached to an empty
+heading produces `dangling_code_annotation`. Duplicate non-empty anchors in
+one file produce `duplicate_doc_anchor`; DocBridge does not add GitHub-style
+numeric suffixes.
 Each direction is validated independently, so a resolving target can still
 report a missing backlink. Run `docbridge check` after every edit.
 

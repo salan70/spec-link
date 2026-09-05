@@ -162,14 +162,109 @@ function extractMarkdownLinks(content: string): MarkdownLink[] {
     if (fence !== null) {
       continue;
     }
-    for (const match of line.matchAll(/!?\[[^\]]*\]\((<[^>]+>|[^\s)]+)(?:\s+[^)]*)?\)/g)) {
-      const rawTarget = match[1];
-      if (rawTarget !== undefined) {
-        links.push({ target: rawTarget.replace(/^<|>$/g, "") });
+    links.push(...extractMarkdownLinksFromLine(line));
+  }
+  return links;
+}
+
+function extractMarkdownLinksFromLine(line: string): MarkdownLink[] {
+  const links: MarkdownLink[] = [];
+  for (let index = 0; index < line.length; ) {
+    const inlineCodeEnd = findInlineCodeEnd(line, index);
+    if (inlineCodeEnd !== null) {
+      index = inlineCodeEnd;
+      continue;
+    }
+
+    const character = line[index];
+    let openingBracket: number | null = null;
+    if (character === "[") {
+      openingBracket = index;
+    } else if (character === "!" && line[index + 1] === "[") {
+      openingBracket = index + 1;
+    }
+    if (openingBracket !== null) {
+      const link = parseMarkdownLink(line, openingBracket);
+      if (link !== null) {
+        links.push({ target: link.target });
+        index = link.end;
+        continue;
+      }
+    }
+    index += 1;
+  }
+  return links;
+}
+
+function findInlineCodeEnd(line: string, start: number): number | null {
+  if (line[start] !== "`") {
+    return null;
+  }
+
+  const delimiterLength = countBackticks(line, start);
+  for (let index = start + delimiterLength; index < line.length; ) {
+    if (line[index] !== "`") {
+      index += 1;
+      continue;
+    }
+    const closingLength = countBackticks(line, index);
+    if (closingLength === delimiterLength) {
+      return index + closingLength;
+    }
+    index += closingLength;
+  }
+  return null;
+}
+
+function countBackticks(line: string, start: number): number {
+  let count = 0;
+  while (line[start + count] === "`") {
+    count += 1;
+  }
+  return count;
+}
+
+type ParsedMarkdownLink = MarkdownLink & {
+  end: number;
+};
+
+function parseMarkdownLink(line: string, openingBracket: number): ParsedMarkdownLink | null {
+  let bracketDepth = 0;
+  let closingBracket = -1;
+  for (let index = openingBracket; index < line.length; index += 1) {
+    const character = line[index];
+    if (character === "\\") {
+      index += 1;
+      continue;
+    }
+    if (character === "[") {
+      bracketDepth += 1;
+    } else if (character === "]") {
+      bracketDepth -= 1;
+      if (bracketDepth === 0) {
+        closingBracket = index;
+        break;
       }
     }
   }
-  return links;
+  if (closingBracket < 0 || line[closingBracket + 1] !== "(") {
+    return null;
+  }
+
+  const closingParenthesis = line.indexOf(")", closingBracket + 2);
+  if (closingParenthesis < 0) {
+    return null;
+  }
+  const destination = line.slice(closingBracket + 2, closingParenthesis);
+  const match = /^(<[^>]+>|[^\s)]+)(?:\s+[^)]*)?$/.exec(destination);
+  const rawTarget = match?.[1];
+  if (rawTarget === undefined) {
+    return null;
+  }
+  return {
+    target: rawTarget.replace(/^<|>$/g, ""),
+    end: closingParenthesis + 1,
+  };
 }
 
 function checkRelativeLink(
