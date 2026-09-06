@@ -160,6 +160,13 @@ function installAndSmoke(tarballPath: string, tempRoot: string, options: SmokeOp
     assertDocumentationCommands((args) =>
       runResult([runtime, "node_modules/.bin/docbridge", ...args], tempRoot),
     );
+
+    const upgradeFixture = join(tempRoot, `upgrade-fixture-${runtime}`);
+    mkdirSync(join(upgradeFixture, ".claude/skills/docbridge-adopt"), { recursive: true });
+    assertUpgradeCommand({
+      execute: (args) => runResult([runtime, "node_modules/.bin/docbridge", ...args], tempRoot),
+      fixtureRoot: upgradeFixture,
+    });
   }
 
   mkdirSync(join(tempRoot, "fixture/src"), { recursive: true });
@@ -316,6 +323,51 @@ export function assertDocumentationCommands(execute: (args: string[]) => Command
     if (unknown.stderr.includes(legacy)) {
       throw new Error(`docs show missing exposed legacy name ${legacy}`);
     }
+  }
+}
+
+/**
+ * Exercise `upgrade` against a throwaway project inside the installed package.
+ *
+ * The packed layout resolves `templates/skills` through a different package
+ * root than a source checkout, so installing the managed skill is only really
+ * covered from the tarball. The fixture is created by the caller and carries
+ * one legacy skill directory, so the read-only and destructive paths are both
+ * observed.
+ */
+export function assertUpgradeCommand(input: {
+  execute: (args: string[]) => CommandResult;
+  fixtureRoot: string;
+  exists?: (path: string) => boolean;
+}): void {
+  const exists = input.exists ?? existsSync;
+  const legacySkill = join(input.fixtureRoot, ".claude/skills/docbridge-adopt");
+  const managedSkill = join(input.fixtureRoot, ".claude/skills/docbridge");
+
+  const check = input.execute(["upgrade", "--check", "--root", input.fixtureRoot]);
+  assertExitCode(check, 0, "upgrade --check");
+  for (const expected of [
+    "- .claude/skills/docbridge: absent",
+    "- .claude/skills/docbridge-adopt (directory)",
+  ]) {
+    if (!check.stdout.includes(expected)) {
+      throw new Error(`upgrade --check did not report: ${expected}`);
+    }
+  }
+  if (check.stdout.includes("Operations:")) {
+    throw new Error("upgrade --check planned operations; it must stay read-only");
+  }
+  if (!exists(legacySkill)) {
+    throw new Error("upgrade --check removed a legacy skill directory");
+  }
+
+  const apply = input.execute(["upgrade", "--force", "--yes", "--root", input.fixtureRoot]);
+  assertExitCode(apply, 0, "upgrade --force --yes");
+  if (!exists(join(managedSkill, "SKILL.md"))) {
+    throw new Error("upgrade did not install the managed docbridge skill from the packed package");
+  }
+  if (exists(legacySkill)) {
+    throw new Error("upgrade --force did not remove the legacy skill directory");
   }
 }
 

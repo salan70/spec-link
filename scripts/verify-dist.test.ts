@@ -51,6 +51,10 @@ test("verifyDistPackage runs dist checks from the inspected root", async () => {
         command: [distCli, "check", "--root", "examples/typescript"],
         cwd: root,
       },
+      {
+        command: [distCli, "upgrade", "--check", "--agent-target", "none"],
+        cwd: root,
+      },
     ]);
   } finally {
     rmSync(root, { recursive: true, force: true });

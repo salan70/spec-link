@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `docbridge upgrade` reports version drift and reconciles managed agent
+  assets. `--check` is a read-only diagnostic covering the installed version,
+  the latest stable release, package-manager upgrade guidance, the managed
+  `docbridge` skill state, leftover legacy skill directories, symlinks, and
+  locally modified files. `--dry-run` prints the full plan, and `--force`
+  replaces the managed skill and removes only the five known legacy skill
+  directories when they are ordinary directories reached through ordinary
+  directories. Every path component below the project root is checked, so a
+  symlinked `.agents/skills` or `.claude/skills` can never route a write or a
+  removal outside the selected project. Symlinks and regular files carrying a
+  legacy name are reported and preserved, replacing the managed skill reproduces
+  the packaged template exactly, destructive operations require `--yes` or an
+  interactive confirmation, and configuration, hooks, CI recipes, and user files
+  are never touched.
+- Human-readable terminal invocations print one stderr notice when a newer
+  stable release is published on npm. The lookup uses a bounded timeout and a
+  daily per-user cache, fails silently offline, and is suppressed in CI, for
+  `--json` output, for `lsp` and `upgrade`, for non-TTY output, and when
+  `DOCBRIDGE_NO_UPDATE_CHECK=1` is set. That variable also stops `upgrade` from
+  contacting the registry. Command stdout and exit codes are unchanged. Upgrade
+  guidance is derived from the project the command acted on (`--root`) and the
+  current directory, so a project dependency invoked from elsewhere is not
+  mistaken for a global install.
 - A documentation hub, matching Japanese task guides, and the read-only
   `just check-docs` structural gate provide a maintained path through user,
   integration, specification, and contributor documentation.

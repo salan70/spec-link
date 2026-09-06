@@ -78,6 +78,11 @@
     },
     {
       "code": "undocumented_symbol",
+      "target": "src/cli/errors.ts#upgradeConfirmationGuidance",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
       "target": "src/cli/help.ts#GLOBAL_HELP",
       "class": "sibling_export"
     },
@@ -143,6 +148,11 @@
     },
     {
       "code": "undocumented_symbol",
+      "target": "src/cli/index.ts#CliRuntime",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
       "target": "src/cli/index.ts#parseCheckOptions",
       "class": "sibling_export"
     },
@@ -185,6 +195,11 @@
       "code": "undocumented_symbol",
       "target": "src/cli/test-support.ts#Captured",
       "class": "test_support"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/cli/upgrade.ts#UpgradeRuntime",
+      "class": "sibling_export"
     },
     {
       "code": "undocumented_symbol",
@@ -448,6 +463,11 @@
     },
     {
       "code": "undocumented_symbol",
+      "target": "src/core/init-plan.ts#agentDestinations",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
       "target": "src/core/init-plan.ts#buildConfigFromScope",
       "class": "sibling_export"
     },
@@ -458,7 +478,17 @@
     },
     {
       "code": "undocumented_symbol",
+      "target": "src/core/init-plan.ts#formatFileOp",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
       "target": "src/core/init-plan.ts#formatInitPlan",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/init-plan.ts#INIT_SKILL_NAMES",
       "class": "sibling_export"
     },
     {
@@ -478,12 +508,12 @@
     },
     {
       "code": "undocumented_symbol",
-      "target": "src/core/init-plan.ts#listDistributableSkills",
+      "target": "src/core/init-plan.ts#LEGACY_SKILL_NAMES",
       "class": "sibling_export"
     },
     {
       "code": "undocumented_symbol",
-      "target": "src/core/init-plan.ts#PlannedFileOp",
+      "target": "src/core/init-plan.ts#listDistributableSkills",
       "class": "sibling_export"
     },
     {
@@ -530,6 +560,51 @@
       "code": "undocumented_symbol",
       "target": "src/core/path-order.ts#comparePaths",
       "class": "internal_helper"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/registry.ts#fetchLatestStableVersion",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/registry.ts#FetchLike",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/registry.ts#LatestVersionLookup",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/registry.ts#LatestVersionSource",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/registry.ts#NPM_REGISTRY_LATEST_URL",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/registry.ts#REGISTRY_TIMEOUT_MS",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/registry.ts#ResolveLatestOptions",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/registry.ts#resolveRegistryUrl",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/registry.ts#selectStableVersion",
+      "class": "sibling_export"
     },
     {
       "code": "undocumented_symbol",
@@ -605,6 +680,41 @@
       "code": "undocumented_symbol",
       "target": "src/core/section.ts#MAX_SECTION_LENGTH",
       "class": "internal_helper"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/skill-assets.ts#FileOpAction",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/skill-assets.ts#isSymlink",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/skill-assets.ts#listSkillFiles",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/skill-assets.ts#ManagedPathKind",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/skill-assets.ts#PlannedFileOp",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/skill-assets.ts#SkillTreeComparison",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/skill-assets.ts#unmanageablePathMessage",
+      "class": "sibling_export"
     },
     {
       "code": "undocumented_symbol",
@@ -699,6 +809,171 @@
     {
       "code": "undocumented_symbol",
       "target": "src/core/typescript.ts#typeScriptAdapter",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/update-cache.ts#isUpdateCacheFresh",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/update-cache.ts#readUpdateCache",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/update-cache.ts#UPDATE_CACHE_SCHEMA_VERSION",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/update-cache.ts#UPDATE_CACHE_TTL_MS",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/update-cache.ts#UpdateCacheRecord",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/update-cache.ts#writeUpdateCache",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/update-notice.ts#isUpdateCheckOptedOut",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/update-notice.ts#shouldCheckForUpdates",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/update-notice.ts#UpdateCheckDecision",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/update-notice.ts#UpdateCheckSuppressionReason",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-guidance.ts#detectInstallScope",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-guidance.ts#detectPackageManager",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-guidance.ts#formatUpgradeGuidance",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-guidance.ts#InstallScope",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-guidance.ts#PackageManager",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-guidance.ts#UpgradeGuidance",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#CliVersionReport",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#CliVersionStatus",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#formatUpgradePlan",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#inspectLegacySkills",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#inspectManagedSkill",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#LegacySkillKind",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#LegacySkillReport",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#ManagedSkillReport",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#ManagedSkillState",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#reportCliVersion",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#resolveUpgradeAgentTarget",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#UpgradeMode",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#UpgradeOptions",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#UpgradePlan",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/version.ts#compareStableVersions",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/version.ts#parseStableVersion",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/version.ts#StableVersion",
       "class": "sibling_export"
     },
     {
@@ -854,6 +1129,11 @@
     {
       "code": "unlinked_doc_section",
       "target": "docs/user/commands.md#next-steps",
+      "class": "structural_doc"
+    },
+    {
+      "code": "unlinked_doc_section",
+      "target": "docs/user/commands.md#update-notification",
       "class": "structural_doc"
     },
     {

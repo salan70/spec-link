@@ -89,7 +89,8 @@ backlinks produce diagnostics and exit `1`.
   setup
 - [Linking](docs/user/linking.md) — choose, create, and semantically review
   links
-- [Commands](docs/user/commands.md) — check, related, context, graph, and docs
+- [Commands](docs/user/commands.md) — check, related, context, graph, docs, and
+  upgrade
 - [Automation](docs/user/automation.md) — coding agents, Git hooks, and CI
 - [Troubleshooting](docs/user/troubleshooting.md) — diagnose configuration,
   scanning, and link failures

@@ -53,13 +53,26 @@ export function missingInputGuidance(command: "related" | "context"): string {
   ].join("\n");
 }
 
-export function agentTargetGuidance(command: "init" | "init-with-agent"): string {
+export function agentTargetGuidance(command: "init" | "init-with-agent" | "upgrade"): string {
   return [
     "Provide an agent target:",
     "",
     `  docbridge ${command} --agent-target codex`,
     "",
     commandHelpGuidance(command),
+  ].join("\n");
+}
+
+export function upgradeConfirmationGuidance(): string {
+  return [
+    "Confirm the migration explicitly:",
+    "",
+    "  docbridge upgrade --force --yes",
+    "",
+    "Or inspect it first:",
+    "",
+    "  docbridge upgrade --check",
+    "  docbridge upgrade --force --dry-run",
   ].join("\n");
 }
 

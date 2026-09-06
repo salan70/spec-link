@@ -39,6 +39,9 @@ export async function verifyDistPackage(
   runCommand([distCli, "docs", "list", "--json"], root);
   runCommand([distCli, "docs", "show", "getting-started"], root);
   runCommand([distCli, "check", "--root", "examples/typescript"], root);
+  // Read-only by construction, so it is safe to run against the repository:
+  // it only proves the new command boots from the bundle.
+  runCommand([distCli, "upgrade", "--check", "--agent-target", "none"], root);
 }
 
 function assertPackagedScannersExecutable(root: string): void {
