@@ -34,6 +34,11 @@ visibility などの値が不正です。[設定](configuration.md) の最小例
 終了コード `1` になります。`docbridge --help` または
 `docbridge <command> --help` で有効な形を確認します。
 
+`docbridge upgrade --force` は、管理対象 skill directory の置換や削除を非対話環境で
+確認なしに行おうとした場合もこれに該当します。`--yes` を付けて再実行するか、
+`docbridge upgrade --check` または `docbridge upgrade --force --dry-run` で先に計画を
+確認してください。
+
 `docbridge docs show <name>` が見つからない場合は `docbridge docs list` に表示された
 canonical 名を使います。旧名には v0.9.x の間だけ置換先を示す warning が出ます。
 

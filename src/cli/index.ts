@@ -8,6 +8,8 @@ import { CONFIG_FILE_NAME } from "../core/config";
 import { context as runContextCore, formatContextResult } from "../core/context";
 import { formatDiagnostic, formatSummary } from "../core/diagnostics";
 import { formatGraphResult, graph as runGraphCore } from "../core/graph-output";
+import { resolvePackageRoot } from "../core/init-plan";
+import { resolveLatestStableVersion, type LatestVersionLookup } from "../core/registry";
 import {
   collectGateViolations,
   formatGateResult,
@@ -17,6 +19,12 @@ import {
 } from "../core/related";
 import { check as runChecker } from "../core/resolver";
 import type { DocBridgeDiagnostic } from "../core/types";
+import {
+  decideUpdateCheck,
+  formatUpdateNotice,
+  isUpdateCheckOptedOut,
+} from "../core/update-notice";
+import { detectUpgradeGuidance } from "../core/upgrade-guidance";
 import { runLspServer } from "../lsp/server";
 import { parseDocsCommand, runDocs } from "./docs";
 import {
@@ -46,10 +54,23 @@ import {
   runInitWithAgent,
   type InitRuntime,
 } from "./init";
+import { parseUpgradeOptions, runUpgrade } from "./upgrade";
 
 const VERSION = pkg.version;
 
 export type CliCheckOptions = TableCommandOptions["check"];
+
+/**
+ * Ambient state the CLI needs but cannot obtain synchronously or from argv:
+ * the registry lookup performed by the async entry point, the environment that
+ * gates the update notice, and whether stderr is a terminal. Every field is
+ * optional so unit tests can drive `run` exactly as before.
+ */
+export type CliRuntime = {
+  latest?: LatestVersionLookup;
+  env?: Readonly<Record<string, string | undefined>>;
+  isTty?: boolean;
+};
 
 export type CliIo = {
   stdout: (text: string) => void;
@@ -319,7 +340,12 @@ function editDistance(left: string, right: string): number {
   return previous[right.length] ?? 0;
 }
 
-type CommandHandler = (args: string[], io: CliIo, initRuntime: InitRuntime) => number;
+type CommandHandler = (
+  args: string[],
+  io: CliIo,
+  initRuntime: InitRuntime,
+  cliRuntime: CliRuntime,
+) => number;
 
 const COMMAND_HANDLERS: Record<Subcommand, CommandHandler> = {
   check: (args, io) => runCheck(parseCheckOptions(args), io),
@@ -330,6 +356,12 @@ const COMMAND_HANDLERS: Record<Subcommand, CommandHandler> = {
   init: (args, io, initRuntime) => runInit(parseInitOptions(args, "init"), io, initRuntime),
   "init-with-agent": (args, io, initRuntime) =>
     runInitWithAgent(parseInitOptions(args, "init-with-agent"), io, initRuntime),
+  upgrade: (args, io, initRuntime, cliRuntime) =>
+    runUpgrade(parseUpgradeOptions(args), io, initRuntime, {
+      latest: cliRuntime.latest ?? { status: "unavailable", source: "network" },
+      currentVersion: VERSION,
+      ...(cliRuntime.env !== undefined ? { env: cliRuntime.env } : {}),
+    }),
   lsp: (args) => {
     if (args.length > 0) {
       throw new CliError("lsp takes no options.", commandHelpGuidance("lsp"));
@@ -354,12 +386,14 @@ export function run(
     stderr: (text) => process.stderr.write(text),
   },
   initRuntime: InitRuntime = { prompts: createDefaultPrompts() },
+  cliRuntime: CliRuntime = {},
 ): number {
   const [command, ...rest] = argv;
 
   try {
     if (command === undefined || command === "--help" || command === "-h") {
       io.stdout(GLOBAL_HELP);
+      writeUpdateNotice(argv, io, initRuntime, cliRuntime);
       return 0;
     }
 
@@ -370,11 +404,14 @@ export function run(
 
     if (command === "--version" || command === "-v") {
       io.stdout(`${VERSION}\n`);
+      writeUpdateNotice(argv, io, initRuntime, cliRuntime);
       return 0;
     }
 
     if (isSubcommand(command)) {
-      return COMMAND_HANDLERS[command](rest, io, initRuntime);
+      const exitCode = COMMAND_HANDLERS[command](rest, io, initRuntime, cliRuntime);
+      writeUpdateNotice(argv, io, initRuntime, cliRuntime);
+      return exitCode;
     }
 
     throw new CliError(`Unknown command: ${command}`, unknownCommandGuidance(command));
@@ -388,6 +425,84 @@ export function run(
   }
 }
 
+/**
+ * Print the passive "update available" aside on stderr.
+ *
+ * It is deliberately the last thing a successful invocation writes and it
+ * never influences the exit code, so adding the check cannot change what an
+ * existing consumer of DocBridge output observes on stdout.
+ */
+function writeUpdateNotice(
+  argv: string[],
+  io: CliIo,
+  initRuntime: InitRuntime,
+  cliRuntime: CliRuntime,
+): void {
+  const latest = cliRuntime.latest;
+  if (latest === undefined || latest.status !== "ok") {
+    return;
+  }
+  if (
+    !decideUpdateCheck({
+      argv,
+      ...(cliRuntime.env !== undefined ? { env: cliRuntime.env } : {}),
+      isTty: cliRuntime.isTty ?? false,
+    }).enabled
+  ) {
+    return;
+  }
+
+  const packageRoot = initRuntime.packageRoot ?? resolvePackageRoot();
+  const notice = formatUpdateNotice({
+    current: VERSION,
+    latest: latest.latest,
+    guidance: detectUpgradeGuidance({
+      packageRoot,
+      projectRoot: process.cwd(),
+      ...(cliRuntime.env !== undefined ? { env: cliRuntime.env } : {}),
+    }),
+  });
+  if (notice !== undefined) {
+    io.stderr(notice);
+  }
+}
+
+/**
+ * Resolve the registry lookup this invocation needs, if any.
+ *
+ * `upgrade` asks for a fresh answer because the user requested the diagnosis;
+ * every other command is limited to the daily cache so a routine `check` never
+ * pays for the network more than once a day, and never at all when the notice
+ * is suppressed.
+ */
+async function resolveLatestForInvocation(
+  argv: string[],
+  env: Readonly<Record<string, string | undefined>>,
+  isTty: boolean,
+): Promise<LatestVersionLookup | undefined> {
+  if (isUpdateCheckOptedOut(env)) {
+    return undefined;
+  }
+  if (argv[0] === "upgrade" && !hasHelpFlag(argv.slice(1))) {
+    return resolveLatestStableVersion({ forceRefresh: true });
+  }
+  if (!decideUpdateCheck({ argv, env, isTty }).enabled) {
+    return undefined;
+  }
+  return resolveLatestStableVersion();
+}
+
 if (import.meta.main) {
-  process.exitCode = run(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  const isTty = process.stderr.isTTY === true;
+  const latest = await resolveLatestForInvocation(argv, process.env, isTty);
+  process.exitCode = run(
+    argv,
+    {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    },
+    { prompts: createDefaultPrompts() },
+    { ...(latest !== undefined ? { latest } : {}), env: process.env, isTty },
+  );
 }

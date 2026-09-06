@@ -1,12 +1,4 @@
-import {
-  cpSync,
-  lstatSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { discoverRepository } from "../core/init-discovery";
@@ -22,6 +14,7 @@ import {
   type InitSharedOptions,
   type PlannedFileOp,
 } from "../core/init-plan";
+import { applySkillOperation } from "../core/skill-assets";
 import { agentTargetGuidance, commandHelpGuidance, InitCliError, rootPathGuidance } from "./errors";
 import type { CliIo } from "./index";
 
@@ -321,7 +314,7 @@ function executePlan(projectRoot: string, plan: InitPlan, packageRoot: string): 
     if (operation.action === "skip") {
       continue;
     }
-    executeSkillOperation(projectRoot, packageRoot, operation);
+    applySkillOperation(projectRoot, packageRoot, operation);
   }
 }
 
@@ -333,47 +326,6 @@ function executeFileOperation(projectRoot: string, operation: PlannedFileOp): vo
   if (operation.action === "overwrite" && operation.content !== undefined) {
     writeFileSync(absolutePath, operation.content, "utf8");
   }
-}
-
-function executeSkillOperation(
-  projectRoot: string,
-  packageRoot: string,
-  operation: PlannedFileOp,
-): void {
-  const destinationDir = join(projectRoot, operation.path);
-
-  if (operation.action === "remove") {
-    try {
-      if (lstatSync(destinationDir).isSymbolicLink()) {
-        return;
-      }
-    } catch {
-      return;
-    }
-    rmSync(destinationDir, { recursive: true, force: true });
-    return;
-  }
-
-  if (operation.action !== "create" && operation.action !== "overwrite") {
-    return;
-  }
-
-  try {
-    if (lstatSync(destinationDir).isSymbolicLink()) {
-      return;
-    }
-  } catch {
-    // Destination is absent; create proceeds to mkdirSync.
-  }
-
-  const skillName = operation.path.split("/").at(-1);
-  if (skillName === undefined) {
-    return;
-  }
-
-  const sourceDir = join(packageRoot, "templates", "skills", skillName);
-  mkdirSync(destinationDir, { recursive: true });
-  cpSync(sourceDir, destinationDir, { recursive: true, force: true });
 }
 
 function resolveProjectRoot(root: string, command: InitCommandKind): string {

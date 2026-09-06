@@ -40,6 +40,39 @@ docbridge graph --json --include-content
 endpoint、edge、双方向 pair、未解決リンクを表示します。path を渡すと、そのファイルと
 直接のカウンターパートに絞れます。`--include-content` は `--json` と併用します。
 
+## upgrade: CLI と skill の版を揃える
+
+```sh
+docbridge upgrade --check
+```
+
+読み取り専用の診断です。インストール済み version、npm の最新安定版、利用中の
+package manager に応じた upgrade コマンド、管理対象 `docbridge` skill の状態、
+旧 5 skill 構成の残骸、symlink、ローカル編集を報告します。
+
+DocBridge は自身を upgrade せず、package manager を代行実行もしません。表示された
+コマンドで CLI を更新してから、`docbridge upgrade` を再実行してください。
+
+```sh
+docbridge upgrade --dry-run
+docbridge upgrade --force --yes
+```
+
+`--dry-run` はファイルを書かずに計画のみ出力します。`--force` なしでは既存の skill
+directory を保持し、移行を pending として報告します。`--force` は管理対象 skill を
+同梱 template で置き換え、既知の legacy skill directory のみを削除します。symlink は
+決して削除しません。破壊的操作は `--yes` がなければ確認を求め、非対話実行では失敗
+します。設定、hook、CI recipe、利用者のファイルは変更しません。
+
+## 更新通知
+
+対話端末では、より新しい安定版がある場合に stderr へ1行だけ通知します。短い timeout
+と1日単位の user 単位 cache を使い、オフラインでは無言で失敗し、stdout と終了コードは
+変えません。CI、`--json`、language server、出力のリダイレクト、
+`DOCBRIDGE_NO_UPDATE_CHECK=1` では抑止されます。この環境変数は `upgrade` の registry
+参照も停止します。その場合、最新 version は unknown と表示され、ローカルの asset 状態
+のみを報告します。
+
 ## docs: 同梱ガイドを読む
 
 `docbridge docs list` は CLI と同じ version のガイドを一覧し、

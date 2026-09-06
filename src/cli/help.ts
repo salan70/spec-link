@@ -16,6 +16,7 @@ export const SUBCOMMANDS = [
   "docs",
   "init",
   "init-with-agent",
+  "upgrade",
   "lsp",
 ] as const;
 
@@ -215,6 +216,41 @@ const COMMAND_DOCS: CommandDefinitions = {
     ].join("\n"),
     options: [JSON_OPTION],
   },
+  upgrade: {
+    usage: "[options]",
+    summary: "Use to check for a newer release and migrate managed skills.",
+    description: [
+      "Report DocBridge version drift and reconcile the managed agent skill.",
+      "Use it after a DocBridge release, or when a project still carries assets",
+      "from an older layout. `--check` is read-only. Applying changes touches",
+      "only the managed docbridge skill directory and the known legacy skill",
+      "directories; it never edits config, hooks, CI recipes, or user code, and",
+      "it never runs a package manager for you.",
+    ].join("\n"),
+    options: [
+      {
+        flag: "--root <path>",
+        description: "Project root to inspect. Defaults to current directory.",
+      },
+      {
+        flag: "--check",
+        description: "Report version and managed asset state without writing files.",
+      },
+      {
+        flag: "--dry-run",
+        description: "Print the operations that would be applied without writing files.",
+      },
+      { flag: "--yes", description: "Confirm destructive operations without prompting." },
+      {
+        flag: "--force",
+        description: "Replace the managed skill and remove known legacy skill directories.",
+      },
+      {
+        flag: "--agent-target <target>",
+        description: "Agent target: codex, claude, both, or none.",
+      },
+    ],
+  },
   init: {
     usage: "[options]",
     summary: "Use once per project to set up config and the agent skill.",
@@ -285,7 +321,9 @@ function commandList(): string {
   ).join("\n");
 }
 
-const GLOBAL_OPTION_SECTIONS = (["check", "related", "context", "graph", "docs", "init"] as const)
+const GLOBAL_OPTION_SECTIONS = (
+  ["check", "related", "context", "graph", "docs", "init", "upgrade"] as const
+)
   .map((command) => {
     const label = `${command.charAt(0).toUpperCase()}${command.slice(1)}`;
     return `${label} options:\n${renderOptions(COMMAND_DOCS[command].options)}`;

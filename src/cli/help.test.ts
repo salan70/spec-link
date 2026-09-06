@@ -14,6 +14,7 @@ const COMMANDS = [
   "docs",
   "init",
   "init-with-agent",
+  "upgrade",
   "lsp",
 ] as const;
 

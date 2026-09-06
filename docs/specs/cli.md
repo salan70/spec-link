@@ -1,7 +1,7 @@
 # CLI
 
 DocBridge provides the `check`, `related`, `context`, `graph`, `docs`, `init`,
-`init-with-agent`, and `lsp` commands.
+`init-with-agent`, `upgrade`, and `lsp` commands.
 
 ```sh
 docbridge [--version] [--help]
@@ -13,6 +13,7 @@ docbridge docs list [--json]
 docbridge docs show <name>
 docbridge init [--root <path>] [--yes] [--dry-run] [--force] [--agent-target <target>]
 docbridge init-with-agent [--root <path>] [--yes] [--dry-run] [--force] [--agent-target <target>]
+docbridge upgrade [--root <path>] [--check] [--dry-run] [--yes] [--force] [--agent-target <target>]
 docbridge lsp
 ```
 
@@ -127,8 +128,8 @@ guidance.
 
 Every command supports `--help` (alias `-h`). `docbridge <command> --help`
 prints that command's help on stdout and exits with code `0`, for all of
-`check`, `related`, `context`, `graph`, `docs`, `init`, `init-with-agent`, and
-`lsp`.
+`check`, `related`, `context`, `graph`, `docs`, `init`, `init-with-agent`,
+`upgrade`, and `lsp`.
 Nothing is written to stderr.
 
 The help flag is honored before any other option is validated, so
@@ -571,6 +572,213 @@ Plain `init` reports leftover five-skill directories and leaves them in place;
 
 Existing `docbridge.config.json` files are never overwritten. Valid config is
 summarized; invalid config is reported with repair guidance.
+
+<!-- @code src/core/version.ts#isNewerStableVersion -->
+<!-- @code src/core/registry.ts#resolveLatestStableVersion -->
+
+## Version Discovery
+
+DocBridge discovers the latest published release from the public npm registry
+at `https://registry.npmjs.org/docbridge/latest`. The lookup is deliberately
+independent of the local npm configuration: a project `.npmrc`, a registry
+mirror setting, or a missing package manager cannot change the answer.
+`DOCBRIDGE_REGISTRY_URL` overrides the endpoint for a mirror or for tests.
+
+Only fully stable `X.Y.Z` versions participate. A `latest` dist-tag pointing at
+a prerelease is treated as no answer at all, and a prerelease build of the CLI
+never reports itself as outdated. Comparison is numeric on major, then minor,
+then patch.
+
+The request is bounded by a short timeout (1.5 seconds). Every failure —
+timeout, offline, non-2xx response, unparsable body, prerelease version —
+resolves to `unavailable` rather than raising. No lookup failure ever changes a
+command's exit code or its stdout.
+
+<!-- @code src/core/update-cache.ts#resolveUpdateCachePath -->
+
+### Update Check Cache
+
+Lookups are cached per user, not per project, so the daily budget is shared by
+every repository on the machine. The file is
+`$XDG_CACHE_HOME/docbridge/update-check.json`, falling back to
+`~/.cache/docbridge/update-check.json`; `DOCBRIDGE_UPDATE_CACHE` names it
+directly.
+
+The record stores a schema number, the epoch milliseconds of the lookup, and
+either the latest stable version or `null` for a lookup that failed. A record
+is fresh for 24 hours. A record with an unknown schema, a missing or malformed
+field, unparsable JSON, or a future timestamp is ignored and the lookup is
+retried; an unwritable cache is ignored entirely. Failures are cached too, so
+an offline machine attempts the registry at most once per window.
+
+`upgrade` bypasses a fresh record and always requests the registry, because the
+user asked for the diagnosis. Every other command reads the cache only.
+
+`DOCBRIDGE_NO_UPDATE_CHECK` suppresses the lookup for every command, `upgrade`
+included: the variable names the check, not the notice, so setting it keeps
+DocBridge off the network entirely. `upgrade` then reports the latest version as
+`unknown` and still reports local asset state.
+
+<!-- @code src/core/update-notice.ts#decideUpdateCheck -->
+<!-- @code src/core/update-notice.ts#formatUpdateNotice -->
+
+## Update Notification
+
+When a newer stable release exists, a human-readable invocation prints one
+concise notice to stderr after the command's own output:
+
+```text
+Update available: docbridge 0.8.0 -> 0.9.0
+Upgrade command (project install): bun add -d docbridge@latest
+Run `docbridge upgrade --check` for details, or set DOCBRIDGE_NO_UPDATE_CHECK=1 to silence this notice.
+```
+
+The notice never reaches stdout and never changes the exit code, so existing
+consumers of DocBridge output are unaffected. It is printed only after the
+command completes without a CLI invocation error.
+
+The check is suppressed, and no registry request is made at all, when any of
+the following holds:
+
+| Condition                                                                    | Reason          |
+| ---------------------------------------------------------------------------- | --------------- |
+| `DOCBRIDGE_NO_UPDATE_CHECK` set to a value other than empty, `0`, or `false` | opt-out         |
+| `CI` set to a value other than empty, `0`, or `false`                        | CI              |
+| stderr is not a TTY                                                          | non-TTY         |
+| `--json` appears anywhere in the arguments                                   | JSON output     |
+| the command is `lsp` or `upgrade`                                            | machine command |
+
+`lsp` is suppressed because the language server owns the stream; `upgrade`
+reports the same information in its own output.
+
+<!-- @code src/core/upgrade-guidance.ts#detectUpgradeGuidance -->
+
+## Upgrade Guidance
+
+DocBridge never upgrades itself. It is consumed through Bun, npm, pnpm, Yarn,
+global installs, and package-manager runners, so invoking one of them would
+make the real install state implicit and could disagree with the project's
+lockfile. Instead the CLI prints the command to run.
+
+The package manager is read from `npm_config_user_agent`, which every major
+manager sets for the processes it spawns; a direct binary invocation leaves it
+unset. The install scope is `project` when the running package sits under the
+project root's own `node_modules`, `global` when it sits under any other
+`node_modules`, and `unknown` otherwise (a source checkout, for example).
+
+An undetected manager falls back to npm and an undetected scope uses the
+project-dependency form. The remaining managers are listed as alternatives, so
+the output is always actionable even when nothing was detected:
+
+```text
+Upgrade command (project install): bun add -d docbridge@latest
+Other package managers: npm install --save-dev docbridge@latest, pnpm add -D docbridge@latest, yarn add -D docbridge@latest
+```
+
+<!-- @code src/core/skill-assets.ts#compareSkillTree -->
+<!-- @code src/core/skill-assets.ts#applySkillOperation -->
+
+## Managed Skill Assets
+
+`init` and `upgrade` manage exactly one directory per agent destination:
+`.agents/skills/docbridge` and/or `.claude/skills/docbridge`. Both commands
+share one executor and one symlink guard.
+
+The guard is re-evaluated immediately before a path is touched, not only while
+planning: a destination that became a symlink between planning and execution is
+still left alone. A symlinked skill directory is never created over, never
+overwritten, and never removed, because it is how a repository shares one
+authoritative copy of the skill.
+
+Drift is detected by comparing the installed directory against the packaged
+template file by file. The comparison reports changed files (present in both,
+differing bytes), missing files (in the template, absent locally), and extra
+files (local only). Any non-empty list makes the directory _modified_.
+
+<!-- @code src/core/upgrade-plan.ts#planUpgrade -->
+<!-- @code src/cli/upgrade.ts#parseUpgradeOptions -->
+<!-- @code src/cli/upgrade.ts#runUpgrade -->
+
+## Upgrade Command
+
+The upgrade command reports version drift and reconciles managed agent assets
+using the currently running binary.
+
+```sh
+docbridge upgrade --check
+docbridge upgrade --dry-run
+docbridge upgrade --force --yes
+```
+
+Options:
+
+- `--check` is a read-only diagnostic. It reports the installed version, the
+  latest stable version, package-manager guidance, the managed skill state,
+  legacy skill directories, symlinks, and locally modified files. It plans no
+  operations at all, even when combined with `--force` or `--yes`.
+- `--dry-run` prints the complete operation plan without writing files.
+  Operations render as `would create`, `would overwrite`, and `would remove`.
+- `--force` replaces the managed `docbridge` skill with the packaged template
+  and removes leftover directories from the previous five-skill layout
+  (`docbridge-adopt`, `docbridge-annotate`, `docbridge-link`,
+  `docbridge-review`, `docbridge-sync`). No other directory name is ever
+  removed, and a symlink is never removed.
+- `--yes` confirms destructive operations without prompting.
+- `--root <path>` selects the project root.
+- `--agent-target <target>` selects `codex`, `claude`, `both`, or `none`.
+  Without it, the destinations are those an existing `.agents/` or `.claude/`
+  directory implies; `none` reports versions only.
+
+Without `--force`, an existing managed skill directory is preserved and
+reported under `Pending migration:` instead of being replaced; legacy
+directories are reported the same way. An absent managed skill is installed
+without `--force`, because creating a missing directory destroys nothing.
+
+Destructive operations (overwrite, remove) need confirmation. On a TTY the
+command asks once and applies nothing when the answer is no. Without a TTY and
+without `--yes` the command is a CLI invocation error, so a non-interactive run
+cannot silently replace local edits.
+
+The command's scope is the managed skill directories and nothing else. It never
+modifies the CLI package, `docbridge.config.json`, Git hooks, CI recipes,
+integration recipes, user code, or any other copied file, and it never runs a
+package manager.
+
+When the running binary is older than the registry's latest stable release, the
+command prints the package-manager command and explains that `docbridge
+upgrade` should be re-run afterwards, so managed assets are reconciled from the
+new binary's templates.
+
+Human-readable output leads with the version report, then guidance, messages,
+and the sections that apply:
+
+```text
+DocBridge 0.8.0 (latest stable: 0.9.0)
+Status: outdated
+Upgrade command (project install): bun add -d docbridge@latest
+Other package managers: npm install --save-dev docbridge@latest, pnpm add -D docbridge@latest, yarn add -D docbridge@latest
+
+The running binary is older than the latest stable release. DocBridge does not upgrade itself: run `bun add -d docbridge@latest`, then re-run `docbridge upgrade` so managed assets are reconciled from the new binary.
+
+Managed skills:
+- .claude/skills/docbridge: modified
+    changed: SKILL.md
+    extra: local-notes.md
+
+Legacy skills:
+- .claude/skills/docbridge-link (directory)
+
+Pending migration:
+- .claude/skills/docbridge is locally modified and was preserved. Re-run with --force to replace it with the packaged template.
+
+Next steps:
+- Upgrade the CLI with the command above, then re-run `docbridge upgrade`.
+```
+
+When the registry cannot be reached, the latest version renders as `unknown`,
+the status is `unknown`, and only local asset state is reported. `upgrade`
+exits with code `0` in every case except a CLI invocation error, so it is safe
+to run as a diagnostic without gating anything on its exit code.
 
 <!-- @code src/cli/init.ts#runInitWithAgent -->
 

@@ -59,3 +59,8 @@ currently resolve.
 Unknown commands, unknown options, missing values, invalid roots, and missing
 required inputs exit `1`, write to stderr, and leave stdout empty. These are not
 included in diagnostic JSON because the project scan did not run.
+
+`docbridge upgrade --force` is one of these when it would replace or remove a
+managed skill directory without a terminal to confirm on. Re-run it with
+`--yes`, or inspect the plan first with `docbridge upgrade --check` or
+`docbridge upgrade --force --dry-run`.

@@ -1,10 +1,12 @@
-import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { DocBridgeConfig } from "./config";
 import { resolveConfig } from "./config";
 import type { AgentTarget, CodeLanguageCandidate, RepositoryDiscovery } from "./init-discovery";
+import { isSymlink } from "./skill-assets";
+import type { FileOpAction, PlannedFileOp } from "./skill-assets";
 
 export type InitCommandKind = "init" | "init-with-agent";
 
@@ -16,21 +18,7 @@ export type InitSharedOptions = {
   agentTarget: AgentTarget | undefined;
 };
 
-type FileOpAction =
-  | "create"
-  | "skip"
-  | "overwrite"
-  | "would-create"
-  | "would-overwrite"
-  | "remove"
-  | "would-remove";
-
-export type PlannedFileOp = {
-  action: FileOpAction;
-  path: string;
-  content?: string;
-  reason?: string;
-};
+export type { FileOpAction, PlannedFileOp };
 
 type AgentGuidance = {
   agent: "codex" | "claude";
@@ -56,9 +44,14 @@ export type ConfirmedScope = {
 
 const CONFIG_FILE_NAME = "docbridge.config.json";
 
-const INIT_SKILL_NAMES = ["docbridge"] as const;
+/** The single managed skill installed by `init` and reconciled by `upgrade`. */
+export const INIT_SKILL_NAMES = ["docbridge"] as const;
 
-const LEGACY_SKILL_NAMES = [
+/**
+ * The exact directories left behind by the pre-#124 five-skill layout. Only
+ * these names are ever removed, and only when they are ordinary directories.
+ */
+export const LEGACY_SKILL_NAMES = [
   "docbridge-adopt",
   "docbridge-annotate",
   "docbridge-link",
@@ -564,7 +557,7 @@ function summarizeExistingConfig(config: DocBridgeConfig, messages: string[]): v
   messages.push(`Code scope: ${codeSummary}`);
 }
 
-function agentDestinations(agentTarget: AgentTarget): string[] {
+export function agentDestinations(agentTarget: AgentTarget): string[] {
   switch (agentTarget) {
     case "codex":
       return [".agents/skills"];
@@ -577,15 +570,7 @@ function agentDestinations(agentTarget: AgentTarget): string[] {
   }
 }
 
-function isSymlink(path: string): boolean {
-  try {
-    return lstatSync(path).isSymbolicLink();
-  } catch {
-    return false;
-  }
-}
-
-function formatFileOp(operation: PlannedFileOp): string {
+export function formatFileOp(operation: PlannedFileOp): string {
   let label: string = operation.action;
   if (operation.action === "would-create") {
     label = "would create";

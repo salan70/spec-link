@@ -6,6 +6,7 @@ import { join } from "node:path";
 import {
   assertDocumentationCommands,
   assertInstalledScannerExecutables,
+  assertUpgradeCommand,
   type CommandResult,
 } from "./smoke-packed-package";
 
@@ -98,4 +99,83 @@ test("assertDocumentationCommands rejects aliases exposed by docs list", () => {
       }),
     ),
   ).toThrow("docs list returned non-canonical names");
+});
+
+const upgradeCheckOutput = [
+  "DocBridge 0.8.0 (latest stable: unknown)",
+  "Status: unknown",
+  "",
+  "Managed skills:",
+  "- .claude/skills/docbridge: absent",
+  "",
+  "Legacy skills:",
+  "- .claude/skills/docbridge-adopt (directory)",
+  "",
+].join("\n");
+
+type UpgradeStubOptions = {
+  checkStdout?: string;
+  installsSkill?: boolean;
+  removesLegacy?: boolean;
+  applyExitCode?: number;
+};
+
+function upgradeStub(options: UpgradeStubOptions = {}) {
+  const state = { legacy: true, managed: false };
+  const commands: string[][] = [];
+  const execute = (args: string[]): CommandResult => {
+    commands.push(args);
+    if (args.includes("--check")) {
+      return { exitCode: 0, stdout: options.checkStdout ?? upgradeCheckOutput, stderr: "" };
+    }
+    state.managed = options.installsSkill ?? true;
+    state.legacy = !(options.removesLegacy ?? true);
+    return { exitCode: options.applyExitCode ?? 0, stdout: "", stderr: "" };
+  };
+  const exists = (path: string) =>
+    path.endsWith("docbridge-adopt") ? state.legacy : state.managed;
+  return { commands, execute, exists };
+}
+
+test("assertUpgradeCommand accepts a read-only check followed by a forced migration", () => {
+  const stub = upgradeStub();
+
+  assertUpgradeCommand({ execute: stub.execute, fixtureRoot: "/fixture", exists: stub.exists });
+
+  expect(stub.commands).toEqual([
+    ["upgrade", "--check", "--root", "/fixture"],
+    ["upgrade", "--force", "--yes", "--root", "/fixture"],
+  ]);
+});
+
+test("assertUpgradeCommand rejects a check that plans operations", () => {
+  const stub = upgradeStub({ checkStdout: `${upgradeCheckOutput}\nOperations:\n- create x\n` });
+
+  expect(() =>
+    assertUpgradeCommand({ execute: stub.execute, fixtureRoot: "/fixture", exists: stub.exists }),
+  ).toThrow("must stay read-only");
+});
+
+test("assertUpgradeCommand rejects a check that omits the managed skill state", () => {
+  const stub = upgradeStub({ checkStdout: "DocBridge 0.8.0 (latest stable: unknown)\n" });
+
+  expect(() =>
+    assertUpgradeCommand({ execute: stub.execute, fixtureRoot: "/fixture", exists: stub.exists }),
+  ).toThrow("upgrade --check did not report");
+});
+
+test("assertUpgradeCommand rejects a migration that installs no skill", () => {
+  const stub = upgradeStub({ installsSkill: false });
+
+  expect(() =>
+    assertUpgradeCommand({ execute: stub.execute, fixtureRoot: "/fixture", exists: stub.exists }),
+  ).toThrow("did not install the managed docbridge skill");
+});
+
+test("assertUpgradeCommand rejects a migration that keeps the legacy directory", () => {
+  const stub = upgradeStub({ removesLegacy: false });
+
+  expect(() =>
+    assertUpgradeCommand({ execute: stub.execute, fixtureRoot: "/fixture", exists: stub.exists }),
+  ).toThrow("did not remove the legacy skill directory");
 });
