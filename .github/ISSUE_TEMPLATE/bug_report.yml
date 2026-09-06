@@ -72,17 +72,7 @@ body:
     validations:
       required: true
   - type: textarea
-    id: additional-context
+    id: notes
     attributes:
-      label: Additional context
-      description: Add logs, diagnostics, screenshots, or related links that help explain the problem.
-  - type: dropdown
-    id: contribution
-    attributes:
-      label: Are you interested in implementing a fix?
-      options:
-        - "No"
-        - "Yes, after the issue is accepted"
-        - Not sure
-    validations:
-      required: true
+      label: Notes
+      description: Add only logs, diagnostics, screenshots, or links that are not already included above.

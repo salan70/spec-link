@@ -127,6 +127,11 @@ When branching, committing, pushing, opening or merging a PR, or cutting a relea
 
 When a PR has review comments to triage, reply to, and resolve, use `.agents/skills/review-response/SKILL.md`.
 
+When creating, compressing, or reviewing an issue, pull request body, plan,
+documentation page, or release note, use
+`.agents/skills/concise-writing/SKILL.md`. The canonical writing rules live in
+`docs/contributing/writing.md`; do not duplicate them here.
+
 When a Git hook, CI comment, or `docbridge related --gate` run flags unchanged counterparts, use `.agents/skills/docbridge/SKILL.md` to triage them (sync). When asked whether the docs still match the code with no change set, use the same skill's review procedure.
 
 When working under `.agents/`, also follow `.agents/AGENTS.md`.
