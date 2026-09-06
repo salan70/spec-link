@@ -21,18 +21,30 @@ import {
   type PlannedFileOp,
 } from "./init-plan";
 import type { LatestVersionLookup } from "./registry";
-import { compareSkillTree, isSymlink } from "./skill-assets";
+import { classifyManagedPath, compareSkillTree, unmanageablePathMessage } from "./skill-assets";
+import type { ManagedPathKind } from "./skill-assets";
 import { formatUpgradeGuidance, type UpgradeGuidance } from "./upgrade-guidance";
 import { isNewerStableVersion } from "./version";
 
 const MANAGED_SKILL_NAME = INIT_SKILL_NAMES[0];
 
+/**
+ * `up-to-date`, `modified`, and `template-missing` describe an ordinary managed
+ * directory. Every other value is a path shape the command refuses to touch and
+ * reports instead; they mirror `ManagedPathKind`.
+ */
 export type ManagedSkillState =
   | "absent"
   | "symlink"
+  | "symlinked-parent"
+  | "non-directory"
+  | "blocked-parent"
   | "up-to-date"
   | "modified"
   | "template-missing";
+
+/** Only `directory` is removable; every other kind is reported and preserved. */
+export type LegacySkillKind = Exclude<ManagedPathKind, "absent">;
 
 export type ManagedSkillReport = {
   /** Agent destination directory, such as `.claude/skills`. */
@@ -47,7 +59,7 @@ export type ManagedSkillReport = {
 
 export type LegacySkillReport = {
   path: string;
-  kind: "directory" | "symlink";
+  kind: LegacySkillKind;
 };
 
 export type CliVersionStatus = "up-to-date" | "outdated" | "ahead" | "unknown";
@@ -131,11 +143,9 @@ export function inspectManagedSkill(input: {
     extraFiles: [],
   };
 
-  if (isSymlink(destinationDir)) {
-    return { ...empty, state: "symlink" };
-  }
-  if (!existsSync(destinationDir)) {
-    return { ...empty, state: "absent" };
+  const kind = classifyManagedPath(input.projectRoot, path);
+  if (kind !== "directory") {
+    return { ...empty, state: kind };
   }
   if (!input.templateAvailable) {
     return { ...empty, state: "template-missing" };
@@ -164,13 +174,17 @@ export function inspectLegacySkills(projectRoot: string, destination: string): L
 
   for (const skillName of LEGACY_SKILL_NAMES) {
     const destinationDir = join(projectRoot, destination, skillName);
-    if (isSymlink(destinationDir)) {
-      reports.push({ path: toRootRelative(projectRoot, destinationDir), kind: "symlink" });
+    const path = toRootRelative(projectRoot, destinationDir);
+    const kind = classifyManagedPath(projectRoot, path);
+    if (kind === "absent") {
       continue;
     }
-    if (existsSync(destinationDir)) {
-      reports.push({ path: toRootRelative(projectRoot, destinationDir), kind: "directory" });
+    // A symlinked ancestor classifies every name below it without looking at
+    // the leaf, so confirm something is really there before reporting it.
+    if (kind === "symlinked-parent" && !existsSync(destinationDir)) {
+      continue;
     }
+    reports.push({ path, kind });
   }
 
   return reports;
@@ -228,13 +242,13 @@ export function planUpgrade(input: {
       ? []
       : planOperations({ managedSkills, legacySkills, options: input.options, pending });
   for (const report of managedSkills) {
-    if (report.state === "symlink") {
-      messages.push(`${report.path} is a symlink and was left in place.`);
+    if (isUnmanageableState(report.state)) {
+      messages.push(unmanageablePathMessage(report.path, report.state));
     }
   }
   for (const legacy of legacySkills) {
-    if (legacy.kind === "symlink") {
-      messages.push(`${legacy.path} is a symlink and is never removed.`);
+    if (legacy.kind !== "directory") {
+      messages.push(unmanageablePathMessage(legacy.path, legacy.kind));
     }
   }
 
@@ -268,7 +282,7 @@ function planOperations(input: {
   const operations: PlannedFileOp[] = [];
 
   for (const report of input.managedSkills) {
-    if (report.state === "symlink" || report.state === "template-missing") {
+    if (report.state === "template-missing" || isUnmanageableState(report.state)) {
       continue;
     }
     if (report.state === "absent") {
@@ -293,7 +307,7 @@ function planOperations(input: {
   }
 
   for (const legacy of input.legacySkills) {
-    if (legacy.kind === "symlink") {
+    if (legacy.kind !== "directory") {
       continue;
     }
     if (!input.options.force) {
@@ -310,6 +324,18 @@ function planOperations(input: {
   }
 
   return operations;
+}
+
+/** States that name a path shape the command refuses to write to or remove. */
+type UnmanageableSkillState = Exclude<ManagedPathKind, "absent" | "directory">;
+
+function isUnmanageableState(state: ManagedSkillState): state is UnmanageableSkillState {
+  return (
+    state === "symlink" ||
+    state === "symlinked-parent" ||
+    state === "non-directory" ||
+    state === "blocked-parent"
+  );
 }
 
 function addVersionMessages(

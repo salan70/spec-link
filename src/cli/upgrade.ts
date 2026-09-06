@@ -30,6 +30,8 @@ export type UpgradeRuntime = {
   latest: LatestVersionLookup;
   currentVersion: string;
   env?: Readonly<Record<string, string | undefined>>;
+  /** Defaults to the process working directory; see `detectInstallScope`. */
+  currentDirectory?: string;
 };
 
 /**
@@ -120,6 +122,9 @@ export function runUpgrade(
     guidance: detectUpgradeGuidance({
       packageRoot,
       projectRoot,
+      ...(runtime.currentDirectory !== undefined
+        ? { currentDirectory: runtime.currentDirectory }
+        : {}),
       ...(runtime.env !== undefined ? { env: runtime.env } : {}),
     }),
     discovery: discoverRepository(projectRoot),

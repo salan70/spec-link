@@ -349,3 +349,83 @@ test("upgrade tolerates a missing registry answer", () => {
     expect(c.out).toContain("(latest stable: unknown)");
   });
 });
+
+test("upgrade --force --yes never deletes through a symlinked skills directory", () => {
+  withFixture((fixture) => {
+    const shared = join(fixture.projectRoot, "..", "shared-skills");
+    mkdirSync(join(shared, "docbridge-adopt"), { recursive: true });
+    writeFileSync(join(shared, "docbridge-adopt", "SKILL.md"), "# Shared\n", "utf8");
+    symlinkSync(shared, join(fixture.projectRoot, ".claude/skills"));
+    const c = capture();
+
+    const code = run(
+      ["upgrade", "--force", "--yes", "--root", fixture.projectRoot],
+      c.io,
+      runtime(fixture),
+      { latest: upToDate },
+    );
+
+    expect(code).toBe(0);
+    expect(existsSync(join(shared, "docbridge-adopt"))).toBe(true);
+    expect(c.out).toContain("sits under a symlinked directory");
+    expect(c.out).not.toContain("Operations:");
+  });
+});
+
+test("upgrade --force --yes removes local files the template no longer ships", () => {
+  withFixture((fixture) => {
+    const installed = installTemplate(fixture);
+    writeFileSync(join(installed, "local-notes.md"), "team notes\n", "utf8");
+
+    const code = run(
+      ["upgrade", "--force", "--yes", "--root", fixture.projectRoot],
+      capture().io,
+      runtime(fixture),
+      { latest: upToDate },
+    );
+
+    expect(code).toBe(0);
+    expect(existsSync(join(installed, "local-notes.md"))).toBe(false);
+    expect(readFileSync(join(installed, "SKILL.md"), "utf8")).toBe("# DocBridge skill\n");
+  });
+});
+
+test("upgrade --check reports a clean skill after a forced migration", () => {
+  withFixture((fixture) => {
+    const installed = installTemplate(fixture);
+    writeFileSync(join(installed, "local-notes.md"), "team notes\n", "utf8");
+    run(
+      ["upgrade", "--force", "--yes", "--root", fixture.projectRoot],
+      capture().io,
+      runtime(fixture),
+      { latest: upToDate },
+    );
+
+    const c = capture();
+    run(["upgrade", "--check", "--root", fixture.projectRoot], c.io, runtime(fixture), {
+      latest: upToDate,
+    });
+
+    expect(c.out).toContain("- .claude/skills/docbridge: up-to-date");
+  });
+});
+
+test("upgrade --force --yes never removes a legacy name that is an ordinary file", () => {
+  withFixture((fixture) => {
+    const legacy = join(fixture.projectRoot, ".claude/skills/docbridge-adopt");
+    mkdirSync(join(fixture.projectRoot, ".claude/skills"), { recursive: true });
+    writeFileSync(legacy, "not a directory\n", "utf8");
+    const c = capture();
+
+    const code = run(
+      ["upgrade", "--force", "--yes", "--root", fixture.projectRoot],
+      c.io,
+      runtime(fixture),
+      { latest: upToDate },
+    );
+
+    expect(code).toBe(0);
+    expect(readFileSync(legacy, "utf8")).toBe("not a directory\n");
+    expect(c.out).toContain("exists but is not a directory");
+  });
+});

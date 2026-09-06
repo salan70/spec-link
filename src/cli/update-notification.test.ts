@@ -1,8 +1,12 @@
 import { expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import pkg from "../../package.json";
 import type { CliRuntime } from "./index";
 import { run } from "./index";
+import type { InitPrompts } from "./init";
 import { capture } from "./test-support";
 
 const NEWER: CliRuntime["latest"] = { status: "ok", latest: "99.0.0", source: "cache" };
@@ -17,6 +21,12 @@ function runCheck(cliRuntime: CliRuntime) {
   );
   return { code, out: c.out, err: c.err };
 }
+
+const prompts: InitPrompts = {
+  isInteractive: false,
+  confirm: () => false,
+  select: (_message, _choices, defaultChoice) => defaultChoice,
+};
 
 test("a newer stable release produces one notice on stderr", () => {
   const result = runCheck({ latest: NEWER, env: {}, isTty: true });
@@ -122,4 +132,50 @@ test("a failing command prints no notice", () => {
 
   expect(code).toBe(1);
   expect(c.err).not.toContain("Update available");
+});
+
+test("the notice describes the install selected by --root, not the working directory", () => {
+  const projectRoot = mkdtempSync(join(tmpdir(), "docbridge-notice-root-"));
+  const workingDirectory = mkdtempSync(join(tmpdir(), "docbridge-notice-cwd-"));
+  try {
+    const packageRoot = join(projectRoot, "node_modules", "docbridge");
+    mkdirSync(join(packageRoot, "templates", "skills"), { recursive: true });
+    const c = capture();
+
+    run(
+      ["check", "--root", projectRoot],
+      c.io,
+      { prompts, packageRoot },
+      { latest: NEWER, env: {}, isTty: true, currentDirectory: workingDirectory },
+    );
+
+    expect(c.err).toContain("Upgrade command (project install)");
+    expect(c.err).not.toContain("docbridge@latest -g");
+    expect(c.err).not.toContain("install -g");
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+    rmSync(workingDirectory, { recursive: true, force: true });
+  }
+});
+
+test("the notice keeps project scope when invoked from a nested directory", () => {
+  const projectRoot = mkdtempSync(join(tmpdir(), "docbridge-notice-nested-"));
+  try {
+    const packageRoot = join(projectRoot, "node_modules", "docbridge");
+    mkdirSync(join(packageRoot, "templates", "skills"), { recursive: true });
+    const nested = join(projectRoot, "packages", "web");
+    mkdirSync(nested, { recursive: true });
+    const c = capture();
+
+    run(
+      ["check", "--root", nested],
+      c.io,
+      { prompts, packageRoot },
+      { latest: NEWER, env: {}, isTty: true, currentDirectory: nested },
+    );
+
+    expect(c.err).toContain("Upgrade command (project install)");
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
 });

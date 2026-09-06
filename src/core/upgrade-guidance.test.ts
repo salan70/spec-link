@@ -31,25 +31,85 @@ test.each([
 });
 
 test("detectInstallScope reports a project dependency", () => {
-  expect(detectInstallScope(path("repo", "node_modules", "docbridge"), path("repo"))).toBe(
+  expect(detectInstallScope(path("repo", "node_modules", "docbridge"), [path("repo")])).toBe(
     "project",
   );
 });
 
+test("detectInstallScope reports a project dependency from a nested directory", () => {
+  expect(
+    detectInstallScope(path("repo", "node_modules", "docbridge"), [
+      path("repo", "packages", "web"),
+    ]),
+  ).toBe("project");
+});
+
+test("detectInstallScope reports a project dependency behind the pnpm store layout", () => {
+  const pnpmRoot = path(
+    "repo",
+    "node_modules",
+    ".pnpm",
+    "docbridge@1.0.0",
+    "node_modules",
+    "docbridge",
+  );
+
+  expect(detectInstallScope(pnpmRoot, [path("repo")])).toBe("project");
+});
+
+test("detectInstallScope accepts any candidate root", () => {
+  expect(
+    detectInstallScope(path("repo", "node_modules", "docbridge"), [
+      path("elsewhere"),
+      path("repo", "sub"),
+    ]),
+  ).toBe("project");
+});
+
 test("detectInstallScope reports a global install", () => {
   expect(
-    detectInstallScope(path("usr", "local", "lib", "node_modules", "docbridge"), path("repo")),
+    detectInstallScope(path("usr", "local", "lib", "node_modules", "docbridge"), [path("repo")]),
   ).toBe("global");
 });
 
+test("detectInstallScope does not treat a sibling project as a project install", () => {
+  expect(detectInstallScope(path("repo", "node_modules", "docbridge"), [path("repo-other")])).toBe(
+    "global",
+  );
+});
+
 test("detectInstallScope reports unknown for a source checkout", () => {
-  expect(detectInstallScope(path("repo"), path("repo"))).toBe("unknown");
+  expect(detectInstallScope(path("repo"), [path("repo")])).toBe("unknown");
+});
+
+test("detectUpgradeGuidance keeps project scope when --root selects the install's project", () => {
+  const guidance = detectUpgradeGuidance({
+    packageRoot: path("repo", "node_modules", "docbridge"),
+    projectRoot: path("repo"),
+    currentDirectory: path("somewhere", "else"),
+    env: {},
+  });
+
+  expect(guidance.scope).toBe("project");
+  expect(guidance.primaryCommand).toBe("npm install --save-dev docbridge@latest");
+});
+
+test("detectUpgradeGuidance keeps project scope for a nested current directory", () => {
+  const guidance = detectUpgradeGuidance({
+    packageRoot: path("repo", "node_modules", "docbridge"),
+    projectRoot: path("repo", "packages", "web"),
+    currentDirectory: path("repo", "packages", "web"),
+    env: {},
+  });
+
+  expect(guidance.scope).toBe("project");
 });
 
 test("detectUpgradeGuidance prefers the detected manager and project scope", () => {
   const guidance = detectUpgradeGuidance({
     packageRoot: path("repo", "node_modules", "docbridge"),
     projectRoot: path("repo"),
+    currentDirectory: path("repo"),
     env: { npm_config_user_agent: "bun/1.1.31 npm/? node/v22.0.0" },
   });
 
@@ -67,6 +127,7 @@ test("detectUpgradeGuidance uses global commands for a global install", () => {
   const guidance = detectUpgradeGuidance({
     packageRoot: path("usr", "local", "lib", "node_modules", "docbridge"),
     projectRoot: path("repo"),
+    currentDirectory: path("repo"),
     env: {},
   });
 
@@ -79,6 +140,7 @@ test("detectUpgradeGuidance falls back to the project npm command when nothing i
   const guidance = detectUpgradeGuidance({
     packageRoot: path("repo"),
     projectRoot: path("repo"),
+    currentDirectory: path("repo"),
     env: {},
   });
 
@@ -91,6 +153,7 @@ test("formatUpgradeGuidance labels the detected scope", () => {
   const guidance = detectUpgradeGuidance({
     packageRoot: path("repo", "node_modules", "docbridge"),
     projectRoot: path("repo"),
+    currentDirectory: path("repo"),
     env: {},
   });
 
@@ -103,6 +166,7 @@ test("formatUpgradeGuidance says so when the scope is undetected", () => {
   const guidance = detectUpgradeGuidance({
     packageRoot: path("repo"),
     projectRoot: path("repo"),
+    currentDirectory: path("repo"),
     env: {},
   });
 

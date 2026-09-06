@@ -58,20 +58,31 @@ export function detectPackageManager(env: GuidanceEnv = process.env): PackageMan
 }
 
 /**
- * Classify where the running package lives. A package root under the project's
- * own `node_modules` is a project dependency; any other `node_modules` is a
- * global or runner cache install. A source checkout has neither and stays
- * `unknown`, which keeps the guidance generic instead of guessing wrong.
+ * Classify where the running package lives.
+ *
+ * The decisive fact is the package's _install base_: the directory holding the
+ * first `node_modules` in its path. `/repo/node_modules/docbridge` and the pnpm
+ * shape `/repo/node_modules/.pnpm/docbridge@1.0.0/node_modules/docbridge` both
+ * resolve to `/repo`.
+ *
+ * The install is a project dependency when that base is one of the candidate
+ * roots or an ancestor of one — the same upward resolution npm and Bun perform.
+ * Passing both the selected project root and the current directory matters:
+ * `--root /repo` run from elsewhere, and a bare invocation from `/repo/sub`,
+ * are both project installs, and calling either one global would send the user
+ * to upgrade a different installation than the one that produced the message.
+ * A checkout with no `node_modules` at all stays `unknown` rather than guessing.
  */
-export function detectInstallScope(packageRoot: string, projectRoot: string): InstallScope {
-  const normalizedPackageRoot = withTrailingSeparator(packageRoot);
-  if (!normalizedPackageRoot.includes(`${sep}node_modules${sep}`)) {
+export function detectInstallScope(
+  packageRoot: string,
+  candidateRoots: readonly string[],
+): InstallScope {
+  const installBase = resolveInstallBase(packageRoot);
+  if (installBase === undefined) {
     return "unknown";
   }
 
-  return normalizedPackageRoot.startsWith(`${withTrailingSeparator(projectRoot)}node_modules${sep}`)
-    ? "project"
-    : "global";
+  return candidateRoots.some((root) => isSameOrAncestor(installBase, root)) ? "project" : "global";
 }
 
 /**
@@ -84,10 +95,15 @@ export function detectInstallScope(packageRoot: string, projectRoot: string): In
 export function detectUpgradeGuidance(input: {
   packageRoot: string;
   projectRoot: string;
+  /** Defaults to the process working directory; see `detectInstallScope`. */
+  currentDirectory?: string;
   env?: GuidanceEnv;
 }): UpgradeGuidance {
   const packageManager = detectPackageManager(input.env ?? process.env);
-  const scope = detectInstallScope(input.packageRoot, input.projectRoot);
+  const scope = detectInstallScope(input.packageRoot, [
+    input.projectRoot,
+    input.currentDirectory ?? process.cwd(),
+  ]);
   const commands = scope === "global" ? GLOBAL_COMMANDS : PROJECT_COMMANDS;
   const primaryManager = packageManager ?? "npm";
 
@@ -109,6 +125,17 @@ export function formatUpgradeGuidance(guidance: UpgradeGuidance): string[] {
     `Upgrade command (${scopeLabel}): ${guidance.primaryCommand}`,
     `Other package managers: ${guidance.alternativeCommands.join(", ")}`,
   ];
+}
+
+/** The directory holding the first `node_modules` component of `packageRoot`. */
+function resolveInstallBase(packageRoot: string): string | undefined {
+  const marker = `${sep}node_modules${sep}`;
+  const markerIndex = withTrailingSeparator(packageRoot).indexOf(marker);
+  return markerIndex === -1 ? undefined : packageRoot.slice(0, markerIndex);
+}
+
+function isSameOrAncestor(candidate: string, descendant: string): boolean {
+  return withTrailingSeparator(descendant).startsWith(withTrailingSeparator(candidate));
 }
 
 function withTrailingSeparator(path: string): string {

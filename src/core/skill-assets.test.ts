@@ -11,7 +11,14 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { applySkillOperation, compareSkillTree, isSymlink, listSkillFiles } from "./skill-assets";
+import {
+  applySkillOperation,
+  classifyManagedPath,
+  compareSkillTree,
+  isSymlink,
+  listSkillFiles,
+  unmanageablePathMessage,
+} from "./skill-assets";
 
 type Fixture = {
   root: string;
@@ -193,4 +200,167 @@ test("applySkillOperation removing an absent path is a no-op", () => {
       });
     }).not.toThrow();
   });
+});
+
+test("classifyManagedPath reports an ordinary directory", () => {
+  withFixture((fixture) => {
+    mkdirSync(join(fixture.projectRoot, ".claude/skills/docbridge"), { recursive: true });
+
+    expect(classifyManagedPath(fixture.projectRoot, ".claude/skills/docbridge")).toBe("directory");
+  });
+});
+
+test("classifyManagedPath reports an absent destination", () => {
+  withFixture((fixture) => {
+    expect(classifyManagedPath(fixture.projectRoot, ".claude/skills/docbridge")).toBe("absent");
+  });
+});
+
+test("classifyManagedPath reports a symlinked destination", () => {
+  withFixture((fixture) => {
+    mkdirSync(join(fixture.projectRoot, ".claude/skills"), { recursive: true });
+    symlinkSync(fixture.templateDir, join(fixture.projectRoot, ".claude/skills/docbridge"));
+
+    expect(classifyManagedPath(fixture.projectRoot, ".claude/skills/docbridge")).toBe("symlink");
+  });
+});
+
+test("classifyManagedPath reports a symlinked ancestor rather than the link target", () => {
+  withFixture((fixture) => {
+    const shared = join(fixture.root, "shared-skills");
+    mkdirSync(join(shared, "docbridge"), { recursive: true });
+    mkdirSync(join(fixture.projectRoot, ".claude"), { recursive: true });
+    symlinkSync(shared, join(fixture.projectRoot, ".claude/skills"));
+
+    expect(classifyManagedPath(fixture.projectRoot, ".claude/skills/docbridge")).toBe(
+      "symlinked-parent",
+    );
+  });
+});
+
+test("classifyManagedPath reports a non-directory destination", () => {
+  withFixture((fixture) => {
+    mkdirSync(join(fixture.projectRoot, ".claude/skills"), { recursive: true });
+    writeFileSync(
+      join(fixture.projectRoot, ".claude/skills/docbridge"),
+      "not a directory\n",
+      "utf8",
+    );
+
+    expect(classifyManagedPath(fixture.projectRoot, ".claude/skills/docbridge")).toBe(
+      "non-directory",
+    );
+  });
+});
+
+test("classifyManagedPath reports a parent that is not a directory", () => {
+  withFixture((fixture) => {
+    mkdirSync(join(fixture.projectRoot, ".claude"), { recursive: true });
+    writeFileSync(join(fixture.projectRoot, ".claude/skills"), "not a directory\n", "utf8");
+
+    expect(classifyManagedPath(fixture.projectRoot, ".claude/skills/docbridge")).toBe(
+      "blocked-parent",
+    );
+  });
+});
+
+test.each(["create", "overwrite", "remove"] as const)(
+  "applySkillOperation refuses to %s through a symlinked ancestor",
+  (action) => {
+    withFixture((fixture) => {
+      const shared = join(fixture.root, "shared-skills");
+      mkdirSync(join(shared, "docbridge"), { recursive: true });
+      writeFileSync(join(shared, "docbridge", "SKILL.md"), "# Shared\n", "utf8");
+      mkdirSync(join(fixture.projectRoot, ".claude"), { recursive: true });
+      symlinkSync(shared, join(fixture.projectRoot, ".claude/skills"));
+
+      applySkillOperation(fixture.projectRoot, fixture.packageRoot, {
+        action,
+        path: ".claude/skills/docbridge",
+      });
+
+      expect(existsSync(join(shared, "docbridge"))).toBe(true);
+      expect(readFileSync(join(shared, "docbridge", "SKILL.md"), "utf8")).toBe("# Shared\n");
+    });
+  },
+);
+
+test("applySkillOperation never removes a legacy directory through a symlinked ancestor", () => {
+  withFixture((fixture) => {
+    const shared = join(fixture.root, "shared-skills");
+    mkdirSync(join(shared, "docbridge-adopt"), { recursive: true });
+    mkdirSync(join(fixture.projectRoot, ".claude"), { recursive: true });
+    symlinkSync(shared, join(fixture.projectRoot, ".claude/skills"));
+
+    applySkillOperation(fixture.projectRoot, fixture.packageRoot, {
+      action: "remove",
+      path: ".claude/skills/docbridge-adopt",
+    });
+
+    expect(existsSync(join(shared, "docbridge-adopt"))).toBe(true);
+  });
+});
+
+test("applySkillOperation never removes an ordinary file", () => {
+  withFixture((fixture) => {
+    const legacy = join(fixture.projectRoot, ".claude/skills/docbridge-adopt");
+    mkdirSync(join(fixture.projectRoot, ".claude/skills"), { recursive: true });
+    writeFileSync(legacy, "not a directory\n", "utf8");
+
+    applySkillOperation(fixture.projectRoot, fixture.packageRoot, {
+      action: "remove",
+      path: ".claude/skills/docbridge-adopt",
+    });
+
+    expect(readFileSync(legacy, "utf8")).toBe("not a directory\n");
+  });
+});
+
+test("applySkillOperation overwrite reproduces the packaged tree exactly", () => {
+  withFixture((fixture) => {
+    const installed = join(fixture.projectRoot, ".claude/skills/docbridge");
+    mkdirSync(join(installed, "local"), { recursive: true });
+    writeFileSync(join(installed, "SKILL.md"), "# Edited\n", "utf8");
+    writeFileSync(join(installed, "local-notes.md"), "team notes\n", "utf8");
+    writeFileSync(join(installed, "local", "extra.md"), "more\n", "utf8");
+
+    applySkillOperation(fixture.projectRoot, fixture.packageRoot, {
+      action: "overwrite",
+      path: ".claude/skills/docbridge",
+    });
+
+    expect(listSkillFiles(installed)).toEqual(listSkillFiles(fixture.templateDir));
+    expect(compareSkillTree(installed, fixture.templateDir)).toEqual({
+      modified: [],
+      missing: [],
+      extra: [],
+    });
+  });
+});
+
+test("applySkillOperation leaves a non-directory destination alone on overwrite", () => {
+  withFixture((fixture) => {
+    const destination = join(fixture.projectRoot, ".claude/skills/docbridge");
+    mkdirSync(join(fixture.projectRoot, ".claude/skills"), { recursive: true });
+    writeFileSync(destination, "not a directory\n", "utf8");
+
+    applySkillOperation(fixture.projectRoot, fixture.packageRoot, {
+      action: "overwrite",
+      path: ".claude/skills/docbridge",
+    });
+
+    expect(readFileSync(destination, "utf8")).toBe("not a directory\n");
+  });
+});
+
+test("unmanageablePathMessage keeps the established wording for a symlink", () => {
+  expect(unmanageablePathMessage(".claude/skills/docbridge", "symlink")).toBe(
+    "Skill directory .claude/skills/docbridge is a symlink and was left in place.",
+  );
+});
+
+test("unmanageablePathMessage explains a symlinked ancestor", () => {
+  expect(unmanageablePathMessage(".claude/skills/docbridge", "symlinked-parent")).toContain(
+    "would leave the project root",
+  );
 });

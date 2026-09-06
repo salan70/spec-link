@@ -85,8 +85,12 @@ docbridge upgrade --force --yes
 `--dry-run` prints the full plan without writing files. Without `--force`, an
 existing skill directory is preserved and the migration is reported as pending.
 `--force` replaces the managed `docbridge` skill and removes only the five known
-legacy skill directories, and only when they are ordinary directories: a symlink
-is never removed. Destructive operations ask for confirmation unless `--yes` is
+legacy skill directories, and only when they are ordinary directories reached
+through ordinary directories. A symlink, a regular file carrying a legacy name,
+and anything under a symlinked `.agents/skills` or `.claude/skills` are reported
+and left alone. Replacing the skill reproduces the packaged template exactly, so
+a file you added inside it does not survive `--force`; keep local notes outside
+the managed directory, or make it a symlink to a copy you own. Destructive operations ask for confirmation unless `--yes` is
 passed, and a non-interactive run without `--yes` fails instead of replacing
 local edits. Configuration, hooks, CI recipes, and your own files are never
 touched.

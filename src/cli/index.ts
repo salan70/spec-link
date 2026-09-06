@@ -70,6 +70,8 @@ export type CliRuntime = {
   latest?: LatestVersionLookup;
   env?: Readonly<Record<string, string | undefined>>;
   isTty?: boolean;
+  /** Defaults to the process working directory; injectable for tests. */
+  currentDirectory?: string;
 };
 
 export type CliIo = {
@@ -361,6 +363,9 @@ const COMMAND_HANDLERS: Record<Subcommand, CommandHandler> = {
       latest: cliRuntime.latest ?? { status: "unavailable", source: "network" },
       currentVersion: VERSION,
       ...(cliRuntime.env !== undefined ? { env: cliRuntime.env } : {}),
+      ...(cliRuntime.currentDirectory !== undefined
+        ? { currentDirectory: cliRuntime.currentDirectory }
+        : {}),
     }),
   lsp: (args) => {
     if (args.length > 0) {
@@ -426,6 +431,18 @@ export function run(
 }
 
 /**
+ * Resolve the project the invocation acted on, so upgrade guidance describes
+ * the installation that produced the notice rather than whatever directory the
+ * user happened to stand in. Commands that take `--root` all spell it the same
+ * way, and a positional argument can never look like the flag.
+ */
+function rootOptionOf(argv: readonly string[], currentDirectory: string): string {
+  const flagIndex = argv.indexOf("--root");
+  const value = flagIndex === -1 ? undefined : argv[flagIndex + 1];
+  return value === undefined ? currentDirectory : resolve(currentDirectory, value);
+}
+
+/**
  * Print the passive "update available" aside on stderr.
  *
  * It is deliberately the last thing a successful invocation writes and it
@@ -453,12 +470,14 @@ function writeUpdateNotice(
   }
 
   const packageRoot = initRuntime.packageRoot ?? resolvePackageRoot();
+  const currentDirectory = cliRuntime.currentDirectory ?? process.cwd();
   const notice = formatUpdateNotice({
     current: VERSION,
     latest: latest.latest,
     guidance: detectUpgradeGuidance({
       packageRoot,
-      projectRoot: process.cwd(),
+      projectRoot: rootOptionOf(argv, currentDirectory),
+      currentDirectory,
       ...(cliRuntime.env !== undefined ? { env: cliRuntime.env } : {}),
     }),
   });

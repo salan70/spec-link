@@ -662,9 +662,22 @@ lockfile. Instead the CLI prints the command to run.
 
 The package manager is read from `npm_config_user_agent`, which every major
 manager sets for the processes it spawns; a direct binary invocation leaves it
-unset. The install scope is `project` when the running package sits under the
-project root's own `node_modules`, `global` when it sits under any other
-`node_modules`, and `unknown` otherwise (a source checkout, for example).
+unset.
+
+The install scope is decided by the running package's _install base_: the
+directory holding the first `node_modules` component of its path.
+`/repo/node_modules/docbridge` and the pnpm shape
+`/repo/node_modules/.pnpm/docbridge@1.0.0/node_modules/docbridge` both resolve
+to `/repo`. The scope is `project` when that base is, or is an ancestor of,
+either the project root the command acted on (the `--root` value) or the current
+directory; `global` when it is neither; and `unknown` when the package has no
+`node_modules` component at all, as in a source checkout.
+
+Both roots matter. `docbridge check --root /repo` run from another directory,
+and a bare invocation from `/repo/packages/web`, are both project installs.
+Deciding from the current directory alone would call them global and send the
+user to upgrade a different installation than the one that produced the
+message.
 
 An undetected manager falls back to npm and an undetected scope uses the
 project-dependency form. The remaining managers are listed as alternatives, so
@@ -675,6 +688,7 @@ Upgrade command (project install): bun add -d docbridge@latest
 Other package managers: npm install --save-dev docbridge@latest, pnpm add -D docbridge@latest, yarn add -D docbridge@latest
 ```
 
+<!-- @code src/core/skill-assets.ts#classifyManagedPath -->
 <!-- @code src/core/skill-assets.ts#compareSkillTree -->
 <!-- @code src/core/skill-assets.ts#applySkillOperation -->
 
@@ -684,11 +698,34 @@ Other package managers: npm install --save-dev docbridge@latest, pnpm add -D doc
 `.agents/skills/docbridge` and/or `.claude/skills/docbridge`. Both commands
 share one executor and one symlink guard.
 
-The guard is re-evaluated immediately before a path is touched, not only while
-planning: a destination that became a symlink between planning and execution is
-still left alone. A symlinked skill directory is never created over, never
-overwritten, and never removed, because it is how a repository shares one
-authoritative copy of the skill.
+A destination is classified before it is touched, and every path component
+between the project root and the destination is inspected — not only the final
+one. Checking the leaf alone is not enough: with `.agents/skills` or
+`.claude/skills` symlinked to a shared directory, `lstat` on
+`.claude/skills/docbridge-adopt` reports the ordinary directory inside the link
+target, and a removal would delete a tree outside the selected project root.
+
+The classification has six outcomes, and only two of them are ever written to or
+removed:
+
+| Kind               | Meaning                                               | Operations allowed        |
+| ------------------ | ----------------------------------------------------- | ------------------------- |
+| `absent`           | nothing there yet                                     | create                    |
+| `directory`        | an ordinary directory reached through directories     | create, overwrite, remove |
+| `symlink`          | the destination itself is a symlink                   | none                      |
+| `symlinked-parent` | a component below the project root is a symlink       | none                      |
+| `non-directory`    | the destination exists but is not a directory         | none                      |
+| `blocked-parent`   | a component below the project root is not a directory | none                      |
+
+A symlink is never created over, overwritten, or removed, because it is how a
+repository shares one authoritative copy of the skill. The classification is
+repeated immediately before the filesystem call, not only while planning, so a
+path that changed shape in between is still left alone.
+
+Overwrite replaces rather than merges: the destination tree is removed and the
+packaged template is copied in its place, so a file the template no longer ships
+does not survive a `--force` run. This is what makes a forced migration
+idempotent — the following `upgrade --check` reports the skill as `up-to-date`.
 
 Drift is detected by comparing the installed directory against the packaged
 template file by file. The comparison reports changed files (present in both,
@@ -721,8 +758,11 @@ Options:
 - `--force` replaces the managed `docbridge` skill with the packaged template
   and removes leftover directories from the previous five-skill layout
   (`docbridge-adopt`, `docbridge-annotate`, `docbridge-link`,
-  `docbridge-review`, `docbridge-sync`). No other directory name is ever
-  removed, and a symlink is never removed.
+  `docbridge-review`, `docbridge-sync`). No other name is ever removed, and
+  removal requires an ordinary directory reached through ordinary directories:
+  a symlink, a regular file carrying a legacy name, and anything under a
+  symlinked `.agents/skills` or `.claude/skills` are all reported and
+  preserved. See [Managed Skill Assets](#managed-skill-assets).
 - `--yes` confirms destructive operations without prompting.
 - `--root <path>` selects the project root.
 - `--agent-target <target>` selects `codex`, `claude`, `both`, or `none`.
@@ -748,6 +788,13 @@ When the running binary is older than the registry's latest stable release, the
 command prints the package-manager command and explains that `docbridge
 upgrade` should be re-run afterwards, so managed assets are reconciled from the
 new binary's templates.
+
+The managed skill and each legacy entry are reported with the classification
+from [Managed Skill Assets](#managed-skill-assets). `up-to-date`, `modified`,
+and `template-missing` describe an ordinary managed directory; `absent`,
+`symlink`, `symlinked-parent`, `non-directory`, and `blocked-parent` name a path
+shape the command refuses to write to, each with a message explaining why
+nothing happened.
 
 Human-readable output leads with the version report, then guidance, messages,
 and the sections that apply:

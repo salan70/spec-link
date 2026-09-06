@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import type { DocBridgeConfig } from "./config";
 import { resolveConfig } from "./config";
 import type { AgentTarget, CodeLanguageCandidate, RepositoryDiscovery } from "./init-discovery";
-import { isSymlink } from "./skill-assets";
+import { classifyManagedPath, unmanageablePathMessage } from "./skill-assets";
 import type { FileOpAction, PlannedFileOp } from "./skill-assets";
 
 export type InitCommandKind = "init" | "init-with-agent";
@@ -371,12 +371,13 @@ function planSkillOperations(input: {
 
       const destinationDir = join(input.projectRoot, destination, skillName);
       const path = relative(input.projectRoot, destinationDir);
-      if (isSymlink(destinationDir)) {
-        input.messages.push(`Skill directory ${path} is a symlink and was left in place.`);
+      const kind = classifyManagedPath(input.projectRoot, path);
+      if (kind !== "absent" && kind !== "directory") {
+        input.messages.push(unmanageablePathMessage(path, kind));
         continue;
       }
 
-      const exists = existsSync(destinationDir);
+      const exists = kind === "directory";
       let action: FileOpAction;
       let reason: string;
 
@@ -423,11 +424,12 @@ function planLegacySkillOperations(input: {
   for (const skillName of LEGACY_SKILL_NAMES) {
     const destinationDir = join(input.projectRoot, input.destination, skillName);
     const path = relative(input.projectRoot, destinationDir);
-    if (isSymlink(destinationDir)) {
-      input.messages.push(`Skill directory ${path} is a symlink and was left in place.`);
+    const kind = classifyManagedPath(input.projectRoot, path);
+    if (kind === "absent") {
       continue;
     }
-    if (!existsSync(destinationDir)) {
+    if (kind !== "directory") {
+      input.messages.push(unmanageablePathMessage(path, kind));
       continue;
     }
 

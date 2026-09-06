@@ -12,6 +12,7 @@ import { detectUpgradeGuidance } from "./upgrade-guidance";
 const guidance = detectUpgradeGuidance({
   packageRoot: `${sep}repo${sep}node_modules${sep}docbridge`,
   projectRoot: `${sep}repo`,
+  currentDirectory: `${sep}repo`,
   env: { npm_config_user_agent: "bun/1.1.31 npm/? node/v22.0.0" },
 });
 

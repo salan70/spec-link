@@ -698,12 +698,22 @@
     },
     {
       "code": "undocumented_symbol",
+      "target": "src/core/skill-assets.ts#ManagedPathKind",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
       "target": "src/core/skill-assets.ts#PlannedFileOp",
       "class": "sibling_export"
     },
     {
       "code": "undocumented_symbol",
       "target": "src/core/skill-assets.ts#SkillTreeComparison",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/skill-assets.ts#unmanageablePathMessage",
       "class": "sibling_export"
     },
     {
@@ -904,6 +914,11 @@
     {
       "code": "undocumented_symbol",
       "target": "src/core/upgrade-plan.ts#inspectManagedSkill",
+      "class": "sibling_export"
+    },
+    {
+      "code": "undocumented_symbol",
+      "target": "src/core/upgrade-plan.ts#LegacySkillKind",
       "class": "sibling_export"
     },
     {

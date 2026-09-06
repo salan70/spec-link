@@ -36,11 +36,87 @@ export type SkillTreeComparison = {
   extra: string[];
 };
 
+/**
+ * What sits at a managed destination, from the perspective of the operations
+ * `init` and `upgrade` are allowed to perform.
+ *
+ * Only `absent` and `directory` are ever written to or removed. The remaining
+ * kinds all mean "report it and leave it alone", each for a different reason a
+ * user needs to see.
+ */
+export type ManagedPathKind =
+  | "absent"
+  | "directory"
+  | "symlink"
+  | "non-directory"
+  | "symlinked-parent"
+  | "blocked-parent";
+
 export function isSymlink(path: string): boolean {
   try {
     return lstatSync(path).isSymbolicLink();
   } catch {
     return false;
+  }
+}
+
+/**
+ * Classify a managed destination named relative to the project root.
+ *
+ * Every component below the project root is inspected, not just the final one.
+ * A symlinked ancestor is the dangerous case: with `.claude/skills` linked to a
+ * shared directory, `lstat` on `.claude/skills/docbridge-adopt` reports the
+ * ordinary directory inside the link target, and a remove would delete a tree
+ * outside the selected project root.
+ *
+ * @doc docs/specs/cli.md#managed-skill-assets
+ */
+export function classifyManagedPath(projectRoot: string, relativePath: string): ManagedPathKind {
+  const segments = relativePath.split(/[/\\]/).filter((segment) => segment.length > 0);
+  let current = projectRoot;
+
+  for (const [index, segment] of segments.entries()) {
+    current = join(current, segment);
+    const isLast = index === segments.length - 1;
+
+    let stats;
+    try {
+      stats = lstatSync(current);
+    } catch {
+      // This component does not exist, so nothing below it can either. The
+      // remaining ancestors are created by `mkdir -p` when the plan says create.
+      return "absent";
+    }
+
+    if (stats.isSymbolicLink()) {
+      return isLast ? "symlink" : "symlinked-parent";
+    }
+    if (!stats.isDirectory()) {
+      return isLast ? "non-directory" : "blocked-parent";
+    }
+  }
+
+  return segments.length === 0 ? "blocked-parent" : "directory";
+}
+
+/**
+ * Explain, in one line, why a managed destination was left untouched.
+ *
+ * `init` and `upgrade` share the wording so the same situation reads the same
+ * way whichever command reported it.
+ */
+export function unmanageablePathMessage(path: string, kind: ManagedPathKind): string {
+  switch (kind) {
+    case "symlink":
+      return `Skill directory ${path} is a symlink and was left in place.`;
+    case "symlinked-parent":
+      return `Skill directory ${path} sits under a symlinked directory and was left in place, because writing through it would leave the project root.`;
+    case "non-directory":
+      return `${path} exists but is not a directory, so it was left in place.`;
+    case "blocked-parent":
+      return `Skill directory ${path} cannot be reached because a parent path component is not a directory, so it was left in place.`;
+    default:
+      return `Skill directory ${path} was left in place.`;
   }
 }
 
@@ -85,9 +161,11 @@ export function compareSkillTree(installedDir: string, templateDir: string): Ski
 /**
  * Apply one planned skill operation.
  *
- * Every action re-checks the symlink guard immediately before touching the
- * path: the plan was built earlier, and a destination that became a symlink in
- * between must still be left alone rather than removed or overwritten.
+ * The destination is re-classified immediately before it is touched, not only
+ * while planning: a path that became a symlink, gained a symlinked ancestor, or
+ * stopped being a directory in between must still be left alone. Only an
+ * ordinary directory reached through ordinary directories is ever written to or
+ * removed, so no operation can escape the selected project root.
  *
  * @doc docs/specs/cli.md#managed-skill-assets
  */
@@ -96,25 +174,37 @@ export function applySkillOperation(
   packageRoot: string,
   operation: PlannedFileOp,
 ): void {
+  if (
+    operation.action !== "create" &&
+    operation.action !== "overwrite" &&
+    operation.action !== "remove"
+  ) {
+    return;
+  }
+
+  const kind = classifyManagedPath(projectRoot, operation.path);
   const destinationDir = join(projectRoot, operation.path);
 
   if (operation.action === "remove") {
-    if (!isSymlink(destinationDir)) {
+    if (kind === "directory") {
       rmSync(destinationDir, { recursive: true, force: true });
     }
     return;
   }
 
-  if (operation.action !== "create" && operation.action !== "overwrite") {
-    return;
-  }
-  if (isSymlink(destinationDir)) {
+  if (kind !== "absent" && kind !== "directory") {
     return;
   }
 
-  const skillName = operation.path.split("/").at(-1);
-  if (skillName === undefined) {
+  const skillName = operation.path.split(/[/\\]/).at(-1);
+  if (skillName === undefined || skillName.length === 0) {
     return;
+  }
+
+  // Replace rather than merge: `upgrade --force` promises the packaged tree
+  // exactly, so a file the template no longer ships must not survive.
+  if (operation.action === "overwrite" && kind === "directory") {
+    rmSync(destinationDir, { recursive: true, force: true });
   }
 
   mkdirSync(destinationDir, { recursive: true });

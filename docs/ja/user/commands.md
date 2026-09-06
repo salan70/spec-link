@@ -60,9 +60,14 @@ docbridge upgrade --force --yes
 
 `--dry-run` はファイルを書かずに計画のみ出力します。`--force` なしでは既存の skill
 directory を保持し、移行を pending として報告します。`--force` は管理対象 skill を
-同梱 template で置き換え、既知の legacy skill directory のみを削除します。symlink は
-決して削除しません。破壊的操作は `--yes` がなければ確認を求め、非対話実行では失敗
-します。設定、hook、CI recipe、利用者のファイルは変更しません。
+同梱 template で置き換え、既知の legacy skill directory のみを削除します。削除するのは
+通常の directory を辿って到達できる通常の directory だけです。symlink、legacy 名の
+通常ファイル、symlink された `.agents/skills` や `.claude/skills` の配下は、報告する
+だけで変更しません。skill の置き換えは同梱 template を厳密に再現するため、その
+directory 内に自分で追加したファイルは `--force` で残りません。ローカルのメモは管理
+対象 directory の外に置くか、自分で管理するコピーへの symlink にしてください。破壊的
+操作は `--yes` がなければ確認を求め、非対話実行では失敗します。設定、hook、CI recipe、
+利用者のファイルは変更しません。
 
 ## 更新通知
 
