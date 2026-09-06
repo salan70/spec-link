@@ -76,3 +76,13 @@ body:
     attributes:
       label: Notes
       description: Add only logs, diagnostics, screenshots, or links that are not already included above.
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Are you interested in implementing a fix?
+      options:
+        - "No"
+        - "Yes, after the issue is accepted"
+        - Not sure
+    validations:
+      required: true

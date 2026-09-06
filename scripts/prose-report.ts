@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { readProseBlocks } from "./prose-markdown";
+
 const PROSE_KINDS = ["issue", "pull-request", "document", "plan"] as const;
 
 export type ProseKind = (typeof PROSE_KINDS)[number];
@@ -12,6 +14,19 @@ export type ProseWarning =
     }
   | {
       code: "long-paragraph";
+      line: number;
+      actual: number;
+      limit: number;
+    }
+  | {
+      code: "long-sentence";
+      line: number;
+      sentence: number;
+      actual: number;
+      limit: number;
+    }
+  | {
+      code: "paragraph-sentences";
       line: number;
       actual: number;
       limit: number;
@@ -41,6 +56,8 @@ type ProseReportIo = {
 type Paragraph = {
   line: number;
   words: string[];
+  text: string;
+  countableText: string;
 };
 
 const WORD_LIMITS: Partial<Record<ProseKind, number>> = {
@@ -49,13 +66,18 @@ const WORD_LIMITS: Partial<Record<ProseKind, number>> = {
   plan: 1_500,
 };
 const PARAGRAPH_WORD_LIMIT = 120;
+const SENTENCE_WORD_LIMIT = 25;
+const PARAGRAPH_SENTENCE_LIMIT = 5;
 const DUPLICATE_PARAGRAPH_MINIMUM = 20;
 const USAGE = "Usage: prose-report <issue|pull-request|document|plan> <path|->";
 
 export function analyzeProse(source: string, kind: ProseKind): ProseReport {
-  const cleaned = removeExcludedMarkdown(source);
-  const allWords = extractWords(cleaned);
-  const paragraphs = extractParagraphs(cleaned);
+  const blocks = readProseBlocks(source);
+  const allWords = blocks.flatMap((block) => extractWords(block.countableText));
+  const paragraphs: Paragraph[] = blocks
+    .filter((block) => block.paragraph)
+    .map((block) => ({ ...block, words: extractWords(block.countableText) }))
+    .filter((paragraph) => paragraph.words.length > 0);
   const warnings: ProseWarning[] = [];
   const wordLimit = WORD_LIMITS[kind];
 
@@ -72,6 +94,7 @@ export function analyzeProse(source: string, kind: ProseKind): ProseReport {
         limit: PARAGRAPH_WORD_LIMIT,
       });
     }
+    warnings.push(...sentenceWarnings(paragraph));
   }
 
   const firstLines = new Map<string, number>();
@@ -79,7 +102,7 @@ export function analyzeProse(source: string, kind: ProseKind): ProseReport {
     if (paragraph.words.length < DUPLICATE_PARAGRAPH_MINIMUM) {
       continue;
     }
-    const normalized = paragraph.words.join(" ").toLowerCase();
+    const normalized = extractWords(paragraph.text).join(" ").toLowerCase();
     const originalLine = firstLines.get(normalized);
     if (originalLine === undefined) {
       firstLines.set(normalized, paragraph.line);
@@ -102,81 +125,49 @@ export function analyzeProse(source: string, kind: ProseKind): ProseReport {
   };
 }
 
-function removeExcludedMarkdown(source: string): string {
-  const lines = source.split("\n");
-  let frontmatterEnd = -1;
-  if (/^---\s*$/.test(lines[0] ?? "")) {
-    frontmatterEnd = lines.findIndex((line, index) => index > 0 && /^---\s*$/.test(line));
-  }
-
-  let fenceMarker: "`" | "~" | null = null;
-  let fenceLength = 0;
-  const visibleLines = lines.map((line, index) => {
-    if (frontmatterEnd >= 0 && index <= frontmatterEnd) {
-      return "";
-    }
-
-    const fence = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1];
-    if (fence !== undefined) {
-      const marker = fence[0];
-      if (fenceMarker === null && (marker === "`" || marker === "~")) {
-        fenceMarker = marker;
-        fenceLength = fence.length;
-      } else if (marker === fenceMarker && fence.length >= fenceLength) {
-        fenceMarker = null;
-        fenceLength = 0;
-      }
-      return "";
-    }
-    return fenceMarker === null ? line : "";
-  });
-
-  return visibleLines
-    .join("\n")
-    .replace(/<!--[\s\S]*?(?:-->|$)/g, (comment) => comment.replace(/[^\n]/g, ""));
-}
-
 function extractWords(source: string): string[] {
-  const withoutTargets = source.replace(/\]\([^\n)]*\)/g, "]");
-  return withoutTargets.match(/[\p{L}\p{N}]+(?:['’.-][\p{L}\p{N}]+)*/gu) ?? [];
+  return source.match(/[\p{L}\p{N}]+(?:['’.-][\p{L}\p{N}]+)*/gu) ?? [];
 }
 
-function extractParagraphs(source: string): Paragraph[] {
-  const paragraphs: Paragraph[] = [];
-  let currentLines: string[] = [];
-  let currentLine = 1;
+function sentenceWarnings(paragraph: Paragraph): ProseWarning[] {
+  const sentences = sentenceWords(paragraph.countableText);
+  const warnings: ProseWarning[] = [];
+  for (const [index, words] of sentences.entries()) {
+    if (words.length > SENTENCE_WORD_LIMIT) {
+      warnings.push({
+        code: "long-sentence",
+        line: paragraph.line,
+        sentence: index + 1,
+        actual: words.length,
+        limit: SENTENCE_WORD_LIMIT,
+      });
+    }
+  }
+  if (sentences.length > PARAGRAPH_SENTENCE_LIMIT) {
+    warnings.push({
+      code: "paragraph-sentences",
+      line: paragraph.line,
+      actual: sentences.length,
+      limit: PARAGRAPH_SENTENCE_LIMIT,
+    });
+  }
+  return warnings;
+}
 
-  const flush = (): void => {
-    const words = extractWords(currentLines.join(" "));
-    if (words.length > 0) {
-      paragraphs.push({ line: currentLine, words });
+function sentenceWords(source: string): string[][] {
+  const segments: string[] = [];
+  let start = 0;
+  for (const match of source.matchAll(/[.!?]+["'”’)\]]*(?:\s+|$)/g)) {
+    const prefix = source.slice(Math.max(0, match.index - 8), match.index + 1);
+    if (/\b(?:e\.g|i\.e|vs|mr|mrs|ms|dr|prof|fig|no)\.$/i.test(prefix)) {
+      continue;
     }
-    currentLines = [];
-  };
-
-  source.split("\n").forEach((line, index) => {
-    const lineNumber = index + 1;
-    if (line.trim() === "") {
-      flush();
-      return;
-    }
-
-    const isHeading = /^ {0,3}#{1,6}\s+/.test(line);
-    const isListItem = /^\s*(?:[-*+]|\d+[.)])\s+/.test(line);
-    if (isHeading || isListItem) {
-      flush();
-    }
-    if (currentLines.length === 0) {
-      currentLine = lineNumber;
-    }
-    currentLines.push(line);
-    if (isHeading) {
-      flush();
-    }
-  });
-  flush();
-
-  return paragraphs;
+    const end = match.index + match[0].length;
+    segments.push(source.slice(start, end));
+    start = end;
+  }
+  segments.push(source.slice(start));
+  return segments.map(extractWords).filter((words) => words.length > 0);
 }
 
 function formatReport(report: ProseReport): string {
@@ -196,6 +187,14 @@ function formatReport(report: ProseReport): string {
     } else if (warning.code === "long-paragraph") {
       lines.push(
         `warning ${warning.code}: line ${warning.line} has ${warning.actual} words; advisory limit is ${warning.limit}.`,
+      );
+    } else if (warning.code === "long-sentence") {
+      lines.push(
+        `warning ${warning.code}: sentence ${warning.sentence} in the paragraph at line ${warning.line} has ${warning.actual} words; advisory limit is ${warning.limit}.`,
+      );
+    } else if (warning.code === "paragraph-sentences") {
+      lines.push(
+        `warning ${warning.code}: paragraph at line ${warning.line} has ${warning.actual} sentences; advisory limit is ${warning.limit}.`,
       );
     } else {
       lines.push(
